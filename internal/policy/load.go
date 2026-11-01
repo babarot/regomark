@@ -36,6 +36,7 @@ type module struct {
 //   - a module outside lib/ defines deny or warn, so that a misspelled rule
 //     name does not drop its rule silently, unless it defines nothing but
 //     schema_version and rule_ids;
+//   - at least one module defines deny or warn;
 //   - a module in lib/ is imported by another loaded module and defines
 //     neither deny nor warn.
 func Load(root, dir, entrypoint string) (*Set, error) {
@@ -94,6 +95,7 @@ func checkPackages(mods []module, dir, entrypoint string) error {
 		return fmt.Errorf("entrypoint %q: %w", entrypoint, err)
 	}
 	var errs []error
+	diagnostics := 0 // modules of the entrypoint that define deny or warn
 	for _, m := range mods {
 		name := path.Join(dir, m.rel)
 		pkg := m.m.Package.Path
@@ -116,9 +118,15 @@ func checkPackages(mods []module, dir, entrypoint string) error {
 			errs = append(errs, fmt.Errorf("%s: package %s must be %s: modules outside lib/ belong to the entrypoint package", name, packageName(pkg), packageName(want)))
 			continue
 		}
-		if len(defines) == 0 && !declarationsOnly(m.m) {
+		if len(defines) > 0 {
+			diagnostics++
+		} else if !declarationsOnly(m.m) {
 			errs = append(errs, fmt.Errorf("%s: defines neither deny nor warn", name))
 		}
+	}
+	if diagnostics == 0 {
+		// A policy set without its rules would pass every document
+		errs = append(errs, fmt.Errorf("no module in %s defines deny or warn in package %s", dir, entrypoint))
 	}
 	return errors.Join(errs...)
 }
