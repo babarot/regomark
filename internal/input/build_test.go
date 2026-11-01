@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/babarot/regomark/internal/config"
@@ -49,7 +50,7 @@ func TestBuild(t *testing.T) {
 
 	root := t.TempDir()
 	files := map[string]string{
-		".gitignore":       "docs/local.md\nout/\n",
+		".gitignore":       "docs/local*.md\nout/\n",
 		"docs/b.md":        "# B\n\n[a](a.md) [out](../out/x.txt) [ext](https://example.com)\n",
 		"docs/a.md":        "# A\n",
 		"docs/local.md":    "# ignored document\n",
@@ -67,12 +68,15 @@ func TestBuild(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	// A symbolic link to a document is a document; one to nothing is not
+	// A symbolic link to a document is a document
 	if err := os.Symlink("a.md", filepath.Join(root, "docs", "c.md")); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink("nowhere.md", filepath.Join(root, "docs", "d.md")); err != nil {
-		t.Fatal(err)
+	// One to nothing cannot be read; ignored or excluded, it is not checked
+	for _, name := range []string{"local-broken.md", "000-broken.md"} {
+		if err := os.Symlink("nowhere.md", filepath.Join(root, "docs", name)); err != nil {
+			t.Fatal(err)
+		}
 	}
 	cmd := exec.Command("git", "init", "-q")
 	cmd.Dir = root
@@ -104,6 +108,12 @@ func TestBuild(t *testing.T) {
 		t.Errorf("links:\n got %+v\nwant %+v", links, want)
 	}
 
+	if err := os.Symlink("nowhere.md", filepath.Join(root, "docs", "e.md")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Build(root, &config.Config{Documents: "docs", Exclude: []string{"docs/000-*.md"}}); err == nil || !strings.Contains(err.Error(), "cannot read docs/e.md") {
+		t.Errorf("Build with a broken link as a document: error = %v", err)
+	}
 	if _, err := Build(root, &config.Config{Documents: "docs/sub/none"}); err == nil {
 		t.Error("Build succeeded on a missing directory")
 	}

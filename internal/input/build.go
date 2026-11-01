@@ -52,14 +52,10 @@ func documentPaths(root string, cfg *config.Config) ([]string, error) {
 	}
 	var paths []string
 	for _, e := range entries {
-		if !strings.HasSuffix(e.Name(), ".md") {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
 			continue
 		}
-		p := path.Join(cfg.Documents, e.Name())
-		if info, err := os.Stat(filepath.Join(root, filepath.FromSlash(p))); err != nil || !info.Mode().IsRegular() {
-			continue // a directory, or a symbolic link to nothing
-		}
-		if !cfg.Excluded(p) {
+		if p := path.Join(cfg.Documents, e.Name()); !cfg.Excluded(p) {
 			paths = append(paths, p)
 		}
 	}
@@ -68,11 +64,31 @@ func documentPaths(root string, cfg *config.Config) ([]string, error) {
 		return nil, err
 	}
 	paths = slices.DeleteFunc(paths, func(p string) bool { return ignored[p] })
+	// A document that cannot be read stops the check rather than dropping
+	// out of it, which would let the rest pass
+	for _, p := range paths {
+		info, err := os.Stat(filepath.Join(root, filepath.FromSlash(p)))
+		if err != nil {
+			return nil, fmt.Errorf("documents: cannot read %s: %w", p, unwrapPath(err))
+		}
+		if !info.Mode().IsRegular() {
+			return nil, fmt.Errorf("documents: %s is not a regular file", p)
+		}
+	}
 	if len(paths) == 0 {
 		return nil, fmt.Errorf("documents: no Markdown documents to check in %s", cfg.Documents)
 	}
 	slices.Sort(paths)
 	return paths, nil
+}
+
+// unwrapPath drops the absolute path from a file system error, which names
+// the document already.
+func unwrapPath(err error) error {
+	if pe, ok := errors.AsType[*fs.PathError](err); ok {
+		return pe.Err
+	}
+	return err
 }
 
 // resolveLinks sets the target and the kind of every link.

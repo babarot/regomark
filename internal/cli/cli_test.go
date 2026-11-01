@@ -29,7 +29,8 @@ func isolateGit(t *testing.T) {
 // TestFixtures runs regomark on each directory in testdata/fixtures:
 //
 //	repo/    the repository, laid over testdata/base; a file named gitignore
-//	         becomes .gitignore, which could not be kept here as it is
+//	         becomes .gitignore, which could not be kept here as it is, and
+//	         a symbolic link is copied as a link
 //	args     the arguments, separated by spaces (default: check)
 //	cwd      the directory to run in, relative to the repository (default: root)
 //	stdout   the expected standard output
@@ -98,6 +99,14 @@ func copyTree(t *testing.T, src, dst string) {
 			rel = filepath.Join(filepath.Dir(rel), ".gitignore")
 		}
 		target := filepath.Join(dst, rel)
+		if d.Type()&fs.ModeSymlink != 0 {
+			// Kept as a link, broken or not
+			link, err := os.Readlink(p)
+			if err != nil {
+				return err
+			}
+			return os.Symlink(link, target)
+		}
 		if d.IsDir() {
 			return os.MkdirAll(target, 0o755)
 		}
