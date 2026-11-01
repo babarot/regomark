@@ -97,6 +97,11 @@ func checkPackages(mods []module, dir, entrypoint string) error {
 		name := path.Join(dir, m.rel)
 		pkg := m.m.Package.Path
 		defines := definesDiagnostics(m.m)
+		for _, f := range diagnosticFunctions(m.m) {
+			// A function is left out of the package document, so its
+			// violations would never be collected
+			errs = append(errs, fmt.Errorf("%s:%d: %s must be a set of violations, not a function", name, f.Location.Row, f.Head.Ref()))
+		}
 		if strings.HasPrefix(m.rel, "lib/") {
 			if len(defines) > 0 {
 				errs = append(errs, fmt.Errorf("%s: a library module in lib/ must not define %s", name, strings.Join(defines, " or ")))
@@ -136,6 +141,22 @@ func definesDiagnostics(m *ast.Module) []string {
 	}
 	slices.Sort(found)
 	return found
+}
+
+// diagnosticFunctions returns the rules that define deny or warn as a
+// function.
+func diagnosticFunctions(m *ast.Module) []*ast.Rule {
+	var fs []*ast.Rule
+	for _, r := range m.Rules {
+		ref := r.Head.Ref()
+		if len(ref) == 0 || len(r.Head.Args) == 0 {
+			continue
+		}
+		if v, ok := ref[0].Value.(ast.Var); ok && (v == "deny" || v == "warn") {
+			fs = append(fs, r)
+		}
+	}
+	return fs
 }
 
 // imported reports whether another module imports lib's package, a package

@@ -75,6 +75,8 @@ func TestLoadPackageRules(t *testing.T) {
 			"rules.rego":    "package docs\ndeny contains 1 if true\n",
 			"lib/util.rego": "package lib.util\nimport data.lib.util\nx := true\n",
 		}, []string{"policy/lib/util.rego: no other module imports the library package lib.util"}},
+		{"deny as a function", map[string]string{"schema.rego": schemaRego, "x.rego": "package docs\n\ndeny(doc) := 1 if doc\n"},
+			[]string{"policy/x.rego:3: deny must be a set of violations, not a function"}},
 		{"every error at once", map[string]string{
 			"a.rego": "package a\n", "b.rego": "package docs\n",
 		}, []string{"package a must be docs", "b.rego: defines neither"}},

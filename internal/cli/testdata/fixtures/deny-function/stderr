@@ -1,0 +1,1 @@
+regomark: .regomark/policy/extra.rego:4: deny must be a set of violations, not a function
