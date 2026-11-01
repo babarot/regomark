@@ -1,0 +1,53 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    # The version itself is a constant tagpr keeps current, so that
+    # go install builds report it too
+    ldflags:
+      - -s -w
+      - -X github.com/babarot/regomark/internal/version.Source=release
+    main: .
+    flags:
+      - -trimpath
+
+archives:
+  - formats: ["tar.gz"]
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Os }}_
+      {{- .Arch }}
+    files:
+      - LICENSE*
+      - README*
+      - CHANGELOG*
+
+# tagpr writes the release notes
+changelog:
+  disable: true
+
+release:
+  prerelease: auto
+  draft: false
+
+nix:
+  - repository:
+      owner: babarot
+      name: nur-packages
+      token: "{{ .Env.NUR_GITHUB_TOKEN }}"
+    homepage: https://github.com/babarot/regomark
+    description: Check Markdown documents with rego policies
+    license: mit
+    main_program: regomark
