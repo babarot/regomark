@@ -145,6 +145,22 @@ func TestLoadSymlinkedDirectoryInside(t *testing.T) {
 	}
 }
 
+func TestLoadDanglingSymlink(t *testing.T) {
+	for _, name := range []string{"extra", "extra.rego", "notes.txt"} {
+		t.Run(name, func(t *testing.T) {
+			root := write(t, map[string]string{"schema.rego": schemaRego, "rules.rego": "package docs\ndeny contains 1 if false\n"})
+			if err := os.Symlink("../gone", filepath.Join(root, "policy", name)); err != nil {
+				t.Fatal(err)
+			}
+			_, err := Load(root, "policy", "docs")
+			want := "policy/" + name + " is a symbolic link whose target cannot be read"
+			if err == nil || !strings.Contains(err.Error(), want) {
+				t.Errorf("error = %v, want one containing %q", err, want)
+			}
+		})
+	}
+}
+
 func TestEval(t *testing.T) {
 	root := write(t, map[string]string{
 		"schema.rego": schemaRego,

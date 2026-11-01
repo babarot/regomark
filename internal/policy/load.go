@@ -44,17 +44,29 @@ func Load(root, dir, entrypoint string) (*Set, error) {
 	if real, err := filepath.EvalSymlinks(abs); err == nil {
 		abs = real // WalkDir does not descend into a symbolic link
 	}
+	if _, err := os.Stat(abs); err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, fmt.Errorf("policy: %s does not exist", dir)
+		}
+		return nil, fmt.Errorf("policy: %w", err)
+	}
 	var mods []module
 	err := filepath.WalkDir(abs, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 		if d.Type()&fs.ModeSymlink != 0 {
-			// WalkDir would not descend into it, so its modules would be
-			// neither loaded nor checked; refuse it rather than follow it
-			if info, err := os.Stat(p); err == nil && info.IsDir() {
-				rel, _ := filepath.Rel(abs, p)
-				return errSymlinkedDir{path.Join(dir, filepath.ToSlash(rel))}
+			rel, _ := filepath.Rel(abs, p)
+			name := path.Join(dir, filepath.ToSlash(rel))
+			info, err := os.Stat(p)
+			if err != nil {
+				// Whatever it pointed to, a policy may be missing with it
+				return fmt.Errorf("%s is a symbolic link whose target cannot be read: %w", name, unwrapPath(err))
+			}
+			if info.IsDir() {
+				// WalkDir would not descend into it, so its modules would be
+				// neither loaded nor checked; refuse it rather than follow it
+				return fmt.Errorf("%s is a symbolic link to a directory; put the modules in the policy directory itself", name)
 			}
 		}
 		if d.IsDir() || !strings.HasSuffix(p, ".rego") || strings.HasSuffix(p, "_test.rego") {
@@ -78,12 +90,6 @@ func Load(root, dir, entrypoint string) (*Set, error) {
 		return nil
 	})
 	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return nil, fmt.Errorf("policy: %s does not exist", dir)
-		}
-		if se, ok := errors.AsType[errSymlinkedDir](err); ok {
-			return nil, fmt.Errorf("policy: %s is a symbolic link to a directory; put the modules in the policy directory itself", se.path)
-		}
 		return nil, fmt.Errorf("policy: %w", err)
 	}
 	if len(mods) == 0 {
@@ -100,11 +106,14 @@ func Load(root, dir, entrypoint string) (*Set, error) {
 	return s, nil
 }
 
-// errSymlinkedDir is a symbolic link to a directory inside the policy
-// directory.
-type errSymlinkedDir struct{ path string }
-
-func (e errSymlinkedDir) Error() string { return e.path + ": symbolic link to a directory" }
+// unwrapPath drops the absolute path from a file system error, whose
+// message names the file already.
+func unwrapPath(err error) error {
+	if pe, ok := errors.AsType[*fs.PathError](err); ok {
+		return pe.Err
+	}
+	return err
+}
 
 func checkPackages(mods []module, dir, entrypoint string) error {
 	want, err := ast.ParseRef("data." + entrypoint)
