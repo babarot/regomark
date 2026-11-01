@@ -39,6 +39,9 @@ type module struct {
 //     neither deny nor warn.
 func Load(root, dir, entrypoint string) (*Set, error) {
 	abs := filepath.Join(root, filepath.FromSlash(dir))
+	if real, err := filepath.EvalSymlinks(abs); err == nil {
+		abs = real // WalkDir does not descend into a symbolic link
+	}
 	var mods []module
 	err := filepath.WalkDir(abs, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {

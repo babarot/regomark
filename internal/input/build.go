@@ -52,10 +52,13 @@ func documentPaths(root string, cfg *config.Config) ([]string, error) {
 	}
 	var paths []string
 	for _, e := range entries {
-		if !e.Type().IsRegular() || !strings.HasSuffix(e.Name(), ".md") {
+		if !strings.HasSuffix(e.Name(), ".md") {
 			continue
 		}
 		p := path.Join(cfg.Documents, e.Name())
+		if info, err := os.Stat(filepath.Join(root, filepath.FromSlash(p))); err != nil || !info.Mode().IsRegular() {
+			continue // a directory, or a symbolic link to nothing
+		}
 		if !cfg.Excluded(p) {
 			paths = append(paths, p)
 		}

@@ -108,6 +108,16 @@ func TestLoadMissingDirectory(t *testing.T) {
 	}
 }
 
+func TestLoadSymlinkedDirectory(t *testing.T) {
+	root := write(t, map[string]string{"schema.rego": schemaRego, "rules.rego": "package docs\ndeny contains 1 if false\n"})
+	if err := os.Symlink("policy", filepath.Join(root, "link")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(root, "link", "docs"); err != nil {
+		t.Error(err)
+	}
+}
+
 func TestEval(t *testing.T) {
 	root := write(t, map[string]string{
 		"schema.rego": schemaRego,

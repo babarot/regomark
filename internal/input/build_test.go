@@ -67,6 +67,13 @@ func TestBuild(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	// A symbolic link to a document is a document; one to nothing is not
+	if err := os.Symlink("a.md", filepath.Join(root, "docs", "c.md")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("nowhere.md", filepath.Join(root, "docs", "d.md")); err != nil {
+		t.Fatal(err)
+	}
 	cmd := exec.Command("git", "init", "-q")
 	cmd.Dir = root
 	if out, err := cmd.CombinedOutput(); err != nil {
@@ -84,7 +91,7 @@ func TestBuild(t *testing.T) {
 	for _, d := range in.Documents {
 		paths = append(paths, d.Path)
 	}
-	if want := []string{"docs/a.md", "docs/b.md"}; !reflect.DeepEqual(paths, want) {
+	if want := []string{"docs/a.md", "docs/b.md", "docs/c.md"}; !reflect.DeepEqual(paths, want) {
 		t.Errorf("documents = %v, want %v", paths, want)
 	}
 	links := in.Documents[1].Links
