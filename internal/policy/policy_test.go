@@ -55,7 +55,6 @@ func TestLoadPackageRules(t *testing.T) {
 			"lib/util.rego":    "package lib.util\nimport data.lib.base\nx := base.y\n",
 			"lib/base.rego":    "package lib.base\ny := true\n",
 			"rules_test.rego":  "package other_test\ntest_x if true\n",
-			"sub/schema.rego":  "package docs\nz := 1\n",
 			"sub/more.rego":    "package docs\ndeny contains 1 if false\n",
 			"README.md":        "not rego",
 			"lib/x_test.rego":  "package lib.unused_test\n",
@@ -75,6 +74,12 @@ func TestLoadPackageRules(t *testing.T) {
 			"rules.rego":    "package docs\ndeny contains 1 if true\n",
 			"lib/util.rego": "package lib.util\nimport data.lib.util\nx := true\n",
 		}, []string{"policy/lib/util.rego: no other module imports the library package lib.util"}},
+		{"misspelled rule beside the declarations", map[string]string{
+			"schema.rego": schemaRego + "denies contains 1 if true\n", "rules.rego": "package docs\ndeny contains 1 if false\n",
+		}, []string{"policy/schema.rego: defines neither deny nor warn"}},
+		{"declarations in any file name", map[string]string{
+			"ids.rego": schemaRego, "rules.rego": "package docs\ndeny contains 1 if false\n",
+		}, nil},
 		{"deny as a function", map[string]string{"schema.rego": schemaRego, "x.rego": "package docs\n\ndeny(doc) := 1 if doc\n"},
 			[]string{"policy/x.rego:3: deny must be a set of violations, not a function"}},
 		{"every error at once", map[string]string{

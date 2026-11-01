@@ -38,7 +38,7 @@ An unknown key, or a rule ID in `skip_rules` that the policy set does not declar
 
 regomark loads every `.rego` file under the policy directory except `*_test.rego`, and evaluates `data.<entrypoint>`. It adds no built-in functions, so `opa test`, `opa check` and Regal work on the policies as they are.
 
-- A module outside `lib/` is in the entrypoint package itself (`package adr`; not `package adr.links`, whose rules nothing would collect), and defines `deny` or `warn`, unless the file is named `schema.rego`.
+- A module outside `lib/` is in the entrypoint package itself (`package adr`; not `package adr.links`, whose rules nothing would collect), and defines `deny` or `warn`, unless it defines nothing but `schema_version` and `rule_ids`.
 - A module in `lib/` is a library: another loaded module imports it, and it defines neither `deny` nor `warn`.
 - The policy set defines `schema_version`, equal to the version of the input below, and `rule_ids`, the set of its rule IDs.
 - `deny` and `warn` are sets of objects with exactly `rule` (one of `rule_ids`), `path`, `line` (from 1) and `message`. Either may be left undefined.
