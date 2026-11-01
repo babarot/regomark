@@ -32,14 +32,15 @@ skip_rules: []               # rule IDs whose violations are dropped
 exclude: []                  # documents not to check, as path.Match patterns (docs/adr/000-*.md)
 ```
 
-An unknown key, or a rule ID in `skip_rules` that the policy set does not declare, exits 2. Documents that git ignores are not checked.
+An unknown key, or a rule ID in `skip_rules` that the policy set does not declare, exits 2. Documents that git ignores are not checked, and one that cannot be read, such as a broken symbolic link, exits 2.
 
 ### Policies
 
-regomark loads every `.rego` file under the policy directory except `*_test.rego`, and evaluates `data.<entrypoint>`. It adds no built-in functions, so `opa test`, `opa check` and Regal work on the policies as they are.
+regomark loads every `.rego` file under the policy directory except `*_test.rego`, and evaluates `data.<entrypoint>`. A symbolic link to a directory inside the policy directory is an error, since its modules would otherwise go unchecked. It adds no built-in functions, so `opa test`, `opa check` and Regal work on the policies as they are.
 
 - A module outside `lib/` is in the entrypoint package itself (`package adr`; not `package adr.links`, whose rules nothing would collect), and defines `deny` or `warn`, unless it defines nothing but `schema_version` and `rule_ids`.
 - A module in `lib/` is a library: another loaded module imports it, and it defines neither `deny` nor `warn`.
+- At least one module defines `deny` or `warn`.
 - The policy set defines `schema_version`, equal to the version of the input below, and `rule_ids`, the set of its rule IDs.
 - `deny` and `warn` are sets of objects with exactly `rule` (one of `rule_ids`), `path`, `line` (from 1) and `message`. Either may be left undefined.
 

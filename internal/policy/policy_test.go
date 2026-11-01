@@ -127,6 +127,24 @@ func TestLoadSymlinkedDirectory(t *testing.T) {
 	}
 }
 
+func TestLoadSymlinkedDirectoryInside(t *testing.T) {
+	root := write(t, map[string]string{"schema.rego": schemaRego, "rules.rego": "package docs\ndeny contains 1 if false\n"})
+	shared := filepath.Join(root, "shared")
+	if err := os.MkdirAll(shared, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(shared, "x.rego"), []byte("package docs\ndenies contains 1 if true\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("../shared", filepath.Join(root, "policy", "extra")); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Load(root, "policy", "docs")
+	if err == nil || !strings.Contains(err.Error(), "policy/extra is a symbolic link to a directory") {
+		t.Errorf("error = %v", err)
+	}
+}
+
 func TestEval(t *testing.T) {
 	root := write(t, map[string]string{
 		"schema.rego": schemaRego,

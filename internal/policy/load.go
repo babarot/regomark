@@ -49,6 +49,14 @@ func Load(root, dir, entrypoint string) (*Set, error) {
 		if err != nil {
 			return err
 		}
+		if d.Type()&fs.ModeSymlink != 0 {
+			// WalkDir would not descend into it, so its modules would be
+			// neither loaded nor checked; refuse it rather than follow it
+			if info, err := os.Stat(p); err == nil && info.IsDir() {
+				rel, _ := filepath.Rel(abs, p)
+				return errSymlinkedDir{path.Join(dir, filepath.ToSlash(rel))}
+			}
+		}
 		if d.IsDir() || !strings.HasSuffix(p, ".rego") || strings.HasSuffix(p, "_test.rego") {
 			return nil
 		}
@@ -73,6 +81,9 @@ func Load(root, dir, entrypoint string) (*Set, error) {
 		if errors.Is(err, fs.ErrNotExist) {
 			return nil, fmt.Errorf("policy: %s does not exist", dir)
 		}
+		if se, ok := errors.AsType[errSymlinkedDir](err); ok {
+			return nil, fmt.Errorf("policy: %s is a symbolic link to a directory; put the modules in the policy directory itself", se.path)
+		}
 		return nil, fmt.Errorf("policy: %w", err)
 	}
 	if len(mods) == 0 {
@@ -88,6 +99,12 @@ func Load(root, dir, entrypoint string) (*Set, error) {
 	}
 	return s, nil
 }
+
+// errSymlinkedDir is a symbolic link to a directory inside the policy
+// directory.
+type errSymlinkedDir struct{ path string }
+
+func (e errSymlinkedDir) Error() string { return e.path + ": symbolic link to a directory" }
 
 func checkPackages(mods []module, dir, entrypoint string) error {
 	want, err := ast.ParseRef("data." + entrypoint)
