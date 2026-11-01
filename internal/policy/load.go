@@ -99,6 +99,9 @@ func Load(root, dir, entrypoint string) (*Set, error) {
 	if err := checkPackages(mods, dir, entrypoint); err != nil {
 		return nil, err
 	}
+	if err := checkDataRefs(mods); err != nil {
+		return nil, err
+	}
 	s := &Set{entrypoint: entrypoint}
 	for _, m := range mods {
 		s.modules = append(s.modules, m.m)

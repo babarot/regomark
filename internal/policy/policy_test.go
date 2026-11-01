@@ -280,3 +280,42 @@ func TestSort(t *testing.T) {
 		t.Errorf("sorted:\n got %+v\nwant %+v", vs, want)
 	}
 }
+
+func TestLoadDataRefs(t *testing.T) {
+	lib := "package lib.h\n\nallowed := {\"Accepted\"}\n\nf(x) := x\n"
+	tests := []struct {
+		name, rules, want string // want empty: Load succeeds
+	}{
+		{"alias typo", `import data.lib.h
+deny contains 1 if not "Proposed" in h.alowed`, "policy/rules.rego:4: data.lib.h.alowed is not defined by any loaded module"},
+		{"missing package", `import data.lib.h
+deny contains 1 if data.lib.nothing.here == 1`, "policy/rules.rego:4: data.lib.nothing.here is not defined"},
+		{"same package typo through data", `import data.lib.h
+deny contains 1 if count(data.docs.rule_id) > 0`, "data.docs.rule_id is not defined"},
+		{"defined", `import data.lib.h
+deny contains x if {
+	data.lib.h.allowed[x]
+	h.allowed["Accepted"]
+	count(h) > 0
+	data.lib
+	h.f(1) == 1
+	data[_]
+	count(data.docs.deny) >= 0
+}`, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := write(t, map[string]string{"schema.rego": schemaRego, "lib/h.rego": lib, "rules.rego": "package docs\n\n" + tt.rules + "\n"})
+			_, err := Load(root, "policy", "docs")
+			if tt.want == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Errorf("error = %v, want one containing %q", err, tt.want)
+			}
+		})
+	}
+}

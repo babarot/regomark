@@ -41,6 +41,7 @@ regomark loads every `.rego` file under the policy directory except `*_test.rego
 - A module outside `lib/` is in the entrypoint package itself (`package adr`; not `package adr.links`, whose rules nothing would collect), and defines `deny` or `warn`, unless it defines nothing but `schema_version` and `rule_ids`.
 - A module in `lib/` is a library: another loaded module imports it, and it defines neither `deny` nor `warn`.
 - At least one module defines `deny` or `warn`.
+- Every reference into `data` (through an import or a full path) names something a loaded module defines. regomark loads no other data, so a misspelled library constant is an error rather than a rule that never fires.
 - The policy set defines `schema_version`, equal to the version of the input below, and `rule_ids`, the set of its rule IDs.
 - `deny` and `warn` are sets of objects with exactly `rule` (one of `rule_ids`), `path`, `line` (from 1) and `message`. Either may be left undefined.
 

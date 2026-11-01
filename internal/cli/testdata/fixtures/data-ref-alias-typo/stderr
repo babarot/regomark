@@ -1,0 +1,1 @@
+regomark: .regomark/policy/extra.rego:7: data.lib.h.alowed is not defined by any loaded module
