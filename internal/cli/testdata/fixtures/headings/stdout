@@ -1,0 +1,4 @@
+docs/guide.md:1: warning: [HEADING] h1 Guide
+docs/guide.md:13: warning: [HEADING] h1 Setext title
+docs/guide.md:16: warning: [HEADING] h2 Setext section
+docs/guide.md:23: warning: [HEADING] h3 Closed ATX

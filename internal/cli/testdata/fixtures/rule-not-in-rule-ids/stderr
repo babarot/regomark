@@ -1,0 +1,1 @@
+regomark: data.docs.warn: {"line": 1, "message": "typo in the rule ID", "path": "docs/doc.md", "rule": "HEADNIG"}: rule "HEADNIG" is not in rule_ids

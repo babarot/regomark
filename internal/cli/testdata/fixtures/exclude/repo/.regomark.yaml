@@ -1,0 +1,5 @@
+documents: docs
+policy: .regomark/policy
+entrypoint: docs
+exclude:
+  - docs/000-*.md

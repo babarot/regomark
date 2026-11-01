@@ -1,0 +1,1 @@
+regomark: data.docs.warn: {"line": "1", "message": "line as a string", "path": "docs/doc.md", "rule": "HEADING"}: line must be an integer

@@ -1,0 +1,1 @@
+regomark: .regomark/policy/lib/links.rego: a library module in lib/ must not define deny

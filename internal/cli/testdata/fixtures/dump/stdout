@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "root": ".",
+  "documents": [
+    {
+      "path": "docs/all.md",
+      "name": "all.md",
+      "blocks": [
+        {
+          "kind": "heading",
+          "level": 1,
+          "line": 1,
+          "text": "Title with `code` and emphasis",
+          "lang": ""
+        },
+        {
+          "kind": "paragraph",
+          "level": 0,
+          "line": 4,
+          "text": "A paragraph keeps\nits line breaks, and resolves *escapes* & entities.\nA hard break follows\nhere.",
+          "lang": ""
+        },
+        {
+          "kind": "list",
+          "level": 0,
+          "line": 9,
+          "text": "item one with a link\nitem two\nnested item",
+          "lang": ""
+        },
+        {
+          "kind": "quote",
+          "level": 0,
+          "line": 13,
+          "text": "A quote\nover two lines.",
+          "lang": ""
+        },
+        {
+          "kind": "code",
+          "level": 0,
+          "line": 16,
+          "text": "fmt.Println(\"hi\")\n",
+          "lang": "go"
+        },
+        {
+          "kind": "html",
+          "level": 0,
+          "line": 20,
+          "text": "<div>\nraw HTML\n</div>\n",
+          "lang": ""
+        },
+        {
+          "kind": "rule",
+          "level": 0,
+          "line": 24,
+          "text": "",
+          "lang": ""
+        },
+        {
+          "kind": "table",
+          "level": 0,
+          "line": 26,
+          "text": "Name | Link\nx | y",
+          "lang": ""
+        },
+        {
+          "kind": "code",
+          "level": 0,
+          "line": 30,
+          "text": "indented code\n",
+          "lang": ""
+        }
+      ],
+      "links": [
+        {
+          "dest": "all.md",
+          "text": "a link",
+          "line": 9,
+          "target": "docs/all.md",
+          "kind": "file"
+        },
+        {
+          "dest": "https://example.com",
+          "text": "y",
+          "line": 28,
+          "target": "",
+          "kind": "external"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+regomark: data.docs.deny: {"message": "no line", "path": "docs/doc.md", "rule": "HEADING"}: line is missing

@@ -1,0 +1,3 @@
+documents: doc
+policy: .regomark/policy
+entrypoint: docs

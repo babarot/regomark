@@ -1,0 +1,16 @@
+[
+  {
+    "rule": "HEADING",
+    "severity": "warn",
+    "path": "docs/doc.md",
+    "line": 1,
+    "message": "h1 Title: with, punctuation 100%"
+  },
+  {
+    "rule": "BROKEN",
+    "severity": "deny",
+    "path": "docs/doc.md",
+    "line": 3,
+    "message": "missing gone.md -> docs/gone.md"
+  }
+]

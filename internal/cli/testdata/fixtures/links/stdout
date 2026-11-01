@@ -1,0 +1,26 @@
+docs/100%.md:1: warning: [HEADING] h1 Percent
+docs/a#b.md:1: warning: [HEADING] h1 Hash
+docs/index.md:1: warning: [HEADING] h1 Index
+docs/index.md:3: warning: [LINK] dir ../ -> .
+docs/index.md:3: warning: [LINK] dir sub -> docs/sub
+docs/index.md:3: warning: [LINK] file other.md -> docs/other.md
+docs/index.md:4: warning: [LINK] file /docs/other.md#top -> docs/other.md
+docs/index.md:4: warning: [LINK] file other.md?plain=1 -> docs/other.md
+docs/index.md:6: warning: [LINK] dir ./sub/ -> docs/sub
+docs/index.md:6: warning: [LINK] file my file.md -> docs/my file.md
+docs/index.md:6: warning: [LINK] file other.md -> docs/other.md
+docs/index.md:8: warning: [LINK] file 100%.md -> docs/100%.md
+docs/index.md:8: warning: [LINK] file a%23b.md -> docs/a#b.md
+docs/index.md:8: warning: [LINK] file my%20file.md -> docs/my file.md
+docs/index.md:10: [BROKEN] missing Other.md -> docs/Other.md
+docs/index.md:10: [BROKEN] missing nope.md -> docs/nope.md
+docs/index.md:11: [BROKEN] missing ../build/out.txt -> build/out.txt
+docs/index.md:11: [BROKEN] outside ../../elsewhere.md -> ../elsewhere.md
+docs/index.md:12: [BROKEN] missing ../build -> build
+docs/index.md:14: warning: [LINK] external https://example.com/x.md -> 
+docs/index.md:14: warning: [LINK] external mailto:a@example.com -> 
+docs/index.md:15: warning: [LINK] external #index -> 
+docs/index.md:15: warning: [LINK] external https://example.com/auto -> 
+docs/index.md:15: warning: [LINK] external mailto:me@example.com -> 
+docs/my file.md:1: warning: [HEADING] h1 My file
+docs/other.md:1: warning: [HEADING] h1 Other

@@ -1,0 +1,1 @@
+regomark: .regomark/policy/extra.rego: package adr must be docs: modules outside lib/ belong to the entrypoint package

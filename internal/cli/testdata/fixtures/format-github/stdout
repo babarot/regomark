@@ -1,0 +1,2 @@
+::warning file=docs/doc.md,line=1,title=HEADING::[HEADING] h1 Title: with, punctuation 100%25
+::error file=docs/doc.md,line=3,title=BROKEN::[BROKEN] missing gone.md -> docs/gone.md

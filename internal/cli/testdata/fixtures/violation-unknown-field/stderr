@@ -1,0 +1,1 @@
+regomark: data.docs.deny: {"lin": 1, "message": "misspelled line", "path": "docs/doc.md", "rule": "HEADING"}: unknown field "lin"; a violation has rule, path, line, message

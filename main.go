@@ -2,17 +2,18 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
-	"github.com/babarot/regomark/internal/version"
+	"github.com/babarot/regomark/internal/cli"
 )
 
 func main() {
-	if len(os.Args) == 2 && os.Args[1] == "version" {
-		fmt.Println("regomark", version.String())
-		return
+	dir, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "regomark:", err)
+		os.Exit(cli.ExitError)
 	}
-	fmt.Fprintln(os.Stderr, "usage: regomark version")
-	os.Exit(2)
+	os.Exit(cli.Run(context.Background(), os.Args[1:], dir, os.Stdout, os.Stderr))
 }

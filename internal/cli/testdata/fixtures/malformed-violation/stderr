@@ -1,0 +1,1 @@
+regomark: data.docs.deny: "docs/doc.md: a string, not an object": a violation must be an object with rule, path, line, message, not string

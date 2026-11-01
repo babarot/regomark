@@ -1,0 +1,4 @@
+documents: docs
+policy: .regomark/policy
+entrypoint: docs
+skip_rules: [HEADNIG]

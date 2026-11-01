@@ -1,0 +1,5 @@
+regomark: bundle activation failed: 1 error occurred: .regomark/policy/extra.rego:6: rego_type_error: undefined ref: d.titel
+	d.titel
+	  ^
+	  have: "titel"
+	  want (one of): ["blocks" "links" "name" "path"]

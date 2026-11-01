@@ -1,0 +1,1 @@
+regomark: .regomark/policy/extra.rego: defines neither deny nor warn
