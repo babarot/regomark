@@ -125,14 +125,13 @@ func checkPackages(mods []module, dir, entrypoint string) error {
 	for _, m := range mods {
 		name := path.Join(dir, m.rel)
 		pkg := m.m.Package.Path
-		defines := definesDiagnostics(m.m)
 		for _, f := range diagnosticFunctions(m.m) {
 			// A function is left out of the package document, so its
 			// violations would never be collected
 			errs = append(errs, fmt.Errorf("%s:%d: %s must be a set of violations, not a function", name, f.Location.Row, f.Head.Ref()))
 		}
 		if strings.HasPrefix(m.rel, "lib/") {
-			if len(defines) > 0 {
+			if defines := definesDiagnostics(m.m, true); len(defines) > 0 {
 				errs = append(errs, fmt.Errorf("%s: a library module in lib/ must not define %s", name, strings.Join(defines, " or ")))
 			}
 			if !imported(m, mods) {
@@ -144,7 +143,7 @@ func checkPackages(mods []module, dir, entrypoint string) error {
 			errs = append(errs, fmt.Errorf("%s: package %s must be %s: modules outside lib/ belong to the entrypoint package", name, packageName(pkg), packageName(want)))
 			continue
 		}
-		if len(defines) > 0 {
+		if len(definesDiagnostics(m.m, false)) > 0 {
 			diagnostics++
 		} else if !declarationsOnly(m.m) {
 			errs = append(errs, fmt.Errorf("%s: defines neither deny nor warn", name))
@@ -162,13 +161,15 @@ func packageName(r ast.Ref) string {
 	return strings.TrimPrefix(r.String(), "data.")
 }
 
-// definesDiagnostics returns which of deny and warn the module defines. A
-// default rule does not count: it never yields a violation, and beside a
-// misspelled rule it would make the module look like a policy.
-func definesDiagnostics(m *ast.Module) []string {
+// definesDiagnostics returns which of deny and warn the module defines
+// rules for, with defaults left out when countDefaults is false. A default
+// never yields a violation, so it does not make a module a policy (beside a
+// misspelled rule it would make the module look like one); it still makes a
+// library define deny or warn.
+func definesDiagnostics(m *ast.Module, countDefaults bool) []string {
 	var found []string
 	for _, r := range m.Rules {
-		if r.Default {
+		if r.Default && !countDefaults {
 			continue
 		}
 		ref := r.Head.Ref()

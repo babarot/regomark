@@ -70,6 +70,10 @@ func TestLoadPackageRules(t *testing.T) {
 			"rules.rego":    "package docs\nimport data.lib.util\ndeny contains 1 if util.x\n",
 			"lib/util.rego": "package lib.util\nx := true\ndeny contains 1 if true\nwarn contains 1 if true\n",
 		}, []string{"policy/lib/util.rego: a library module in lib/ must not define deny or warn"}},
+		{"library with a default deny", map[string]string{
+			"rules.rego":    "package docs\nimport data.lib.util\ndeny contains 1 if util.x\n",
+			"lib/util.rego": "package lib.util\nx := true\ndefault deny := set()\n",
+		}, []string{"policy/lib/util.rego: a library module in lib/ must not define deny"}},
 		{"library imported by nobody", map[string]string{
 			"rules.rego":    "package docs\ndeny contains 1 if true\n",
 			"lib/util.rego": "package lib.util\nimport data.lib.util\nx := true\n",
