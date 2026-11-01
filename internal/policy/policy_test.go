@@ -80,6 +80,9 @@ func TestLoadPackageRules(t *testing.T) {
 		{"declarations in any file name", map[string]string{
 			"ids.rego": schemaRego, "rules.rego": "package docs\ndeny contains 1 if false\n",
 		}, nil},
+		{"default deny beside a misspelled rule", map[string]string{
+			"schema.rego": schemaRego, "x.rego": "package docs\ndefault deny := set()\ndenies contains 1 if true\n",
+		}, []string{"policy/x.rego: defines neither deny nor warn"}},
 		{"declarations only", map[string]string{"schema.rego": schemaRego},
 			[]string{"no module in policy defines deny or warn in package docs"}},
 		{"deny as a function", map[string]string{"schema.rego": schemaRego, "x.rego": "package docs\n\ndeny(doc) := 1 if doc\n"},

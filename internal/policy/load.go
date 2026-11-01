@@ -162,10 +162,15 @@ func packageName(r ast.Ref) string {
 	return strings.TrimPrefix(r.String(), "data.")
 }
 
-// definesDiagnostics returns which of deny and warn the module defines.
+// definesDiagnostics returns which of deny and warn the module defines. A
+// default rule does not count: it never yields a violation, and beside a
+// misspelled rule it would make the module look like a policy.
 func definesDiagnostics(m *ast.Module) []string {
 	var found []string
 	for _, r := range m.Rules {
+		if r.Default {
+			continue
+		}
 		ref := r.Head.Ref()
 		if len(ref) == 0 {
 			continue

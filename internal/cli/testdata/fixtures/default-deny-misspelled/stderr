@@ -1,0 +1,2 @@
+regomark: .regomark/policy/rules.rego: defines neither deny nor warn
+no module in .regomark/policy defines deny or warn in package docs
