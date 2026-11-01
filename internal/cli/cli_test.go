@@ -156,6 +156,8 @@ func TestRunCommands(t *testing.T) {
 		stderr string // a substring
 	}{
 		{[]string{"version"}, ExitOK, "regomark 0.", ""},
+		{[]string{"--version"}, ExitOK, "regomark 0.", ""},
+		{[]string{"-v"}, ExitOK, "regomark 0.", ""},
 		{[]string{"version", "x"}, ExitError, "", "Usage:"},
 		{nil, ExitError, "", "Usage:"},
 		{[]string{"--help"}, ExitOK, "Usage:", ""},
