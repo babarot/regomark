@@ -11,7 +11,7 @@ It is under development.
 ```
 regomark check [--config .regomark.yaml] [--format text|github|json]
 regomark dump [--config .regomark.yaml]
-regomark version
+regomark version   # or --version
 ```
 
 - `check` evaluates the policies against the documents and prints the violations. It exits 0 when there is no deny, 1 when there is one, and 2 when the check cannot be done: an invalid configuration, no documents, no policy, a policy that breaks the rules below, or a violation that is not shaped as one.
