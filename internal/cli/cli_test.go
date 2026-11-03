@@ -165,10 +165,10 @@ func TestRunCommands(t *testing.T) {
 		stdout string // a substring
 		stderr string // a substring
 	}{
-		{[]string{"version"}, ExitOK, "regomark 0.", ""},
 		{[]string{"--version"}, ExitOK, "regomark 0.", ""},
-		{[]string{"-v"}, ExitOK, "regomark 0.", ""},
-		{[]string{"version", "x"}, ExitError, "", "Usage:"},
+		{[]string{"--version", "x"}, ExitError, "", "Usage:"},
+		{[]string{"version"}, ExitError, "", `unknown command "version"`},
+		{[]string{"-v"}, ExitError, "", `unknown command "-v"`},
 		{nil, ExitError, "", "Usage:"},
 		{[]string{"--help"}, ExitOK, "Usage:", ""},
 		{[]string{"check", "-h"}, ExitOK, "", "-format"},

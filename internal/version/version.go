@@ -8,7 +8,7 @@ const Version = "0.2.0"
 // -ldflags set it), and empty in any other build: mise run install, go install.
 var Source string
 
-// String is the version as regomark version prints it, marking builds that
+// String is the version as regomark --version prints it, marking builds that
 // did not come from the release workflow.
 func String() string {
 	if Source == "release" {

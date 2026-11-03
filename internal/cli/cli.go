@@ -34,7 +34,7 @@ const usage = `Usage:
   regomark check [--config .regomark.yaml] [--format text|pretty|github|json] [--judge | --no-judge | --judgments FILE]
   regomark dump [--config .regomark.yaml] [--judge | --judgments FILE]
   regomark questions [--config .regomark.yaml]
-  regomark version (or --version)
+  regomark --version
 
 check evaluates the policies against the documents and reports the
 violations; it exits 1 if any is a deny, and 2 if the check cannot be done.
@@ -69,7 +69,7 @@ func Run(ctx context.Context, args []string, dir string, stdout, stderr io.Write
 		err = dump(ctx, args[1:], dir, stdout, stderr)
 	case "questions":
 		err = questions(ctx, args[1:], dir, stdout, stderr)
-	case "version", "--version", "-v":
+	case "--version":
 		if len(args) > 1 {
 			err = errUsage
 			break
