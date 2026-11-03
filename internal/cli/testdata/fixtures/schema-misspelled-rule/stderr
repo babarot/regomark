@@ -1,1 +1,1 @@
-regomark: .regomark/policy/schema.rego: defines neither deny nor warn
+regomark: .regomark/policy/schema.rego: defines none of deny, warn and questions

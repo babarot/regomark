@@ -1,22 +1,26 @@
 // Package input builds what the policies receive as input: the Markdown
-// documents as blocks and links, each with its line, and every link resolved
-// against the repository.
+// documents as blocks and links, each with its line, every link resolved
+// against the repository, and the answers to the policies' questions.
 package input
 
 // SchemaVersion is the version of the input this regomark produces. A policy
 // set declares the version it was written for, and regomark refuses to
 // evaluate it against any other.
-const SchemaVersion = 1
+const SchemaVersion = 2
 
 // Input is the whole input of the policies.
 type Input struct {
 	// SchemaVersion is the version of this structure.
-	SchemaVersion int `json:"schema_version" jsonschema:"enum=1"`
+	SchemaVersion int `json:"schema_version" jsonschema:"enum=2"`
 	// Root is the repository root that every path is relative to. It is
 	// always ".", so the input does not depend on where the repository is.
 	Root string `json:"root" jsonschema:"enum=."`
 	// Documents are the Markdown documents, sorted by path.
 	Documents []Document `json:"documents"`
+	// Judgments are the answers to the questions the policies ask, sorted
+	// by path, id and line. They are empty while the questions and deny are
+	// evaluated, so that neither depends on them.
+	Judgments []Judgment `json:"judgments"`
 }
 
 // Document is one Markdown document.
@@ -41,6 +45,10 @@ type Block struct {
 	// Line is the line the block starts at, counting from 1. For a fenced
 	// code block it is the line of the opening fence.
 	Line int `json:"line" jsonschema:"minimum=1"`
+	// EndLine is the last line of the block, its last child and a closing
+	// fence included, and blank lines after it left out. It is Line for a
+	// block of one line.
+	EndLine int `json:"end_line" jsonschema:"minimum=1"`
 	// Text is the plain text of the block, with code spans in backquotes and
 	// the line breaks of the source kept. A code or HTML block has its
 	// lines as they are; a rule has none.
@@ -74,4 +82,34 @@ const (
 	KindMissing  = "missing"
 	KindOutside  = "outside"
 	KindExternal = "external"
+)
+
+// Judgment is the answer to one question a policy asks.
+type Judgment struct {
+	// ID, Path and Line are those of the question.
+	ID   string `json:"id" jsonschema:"minLength=1"`
+	Path string `json:"path" jsonschema:"minLength=1"`
+	Line int    `json:"line" jsonschema:"minimum=1"`
+	// Status is ok when the question was answered, not_run when it was not
+	// asked, provider_failed when asking failed, and invalid_answer when the
+	// answer was not shaped as one.
+	Status string `json:"status" jsonschema:"enum=ok,enum=not_run,enum=provider_failed,enum=invalid_answer"`
+	// Verdict is yes or no when Status is ok, and empty otherwise.
+	Verdict string `json:"verdict" jsonschema:"enum=,enum=yes,enum=no"`
+	// Reason is why, in a sentence, when Status is ok.
+	Reason string `json:"reason"`
+	// EvidenceLine is the line the answer rests on when Verdict is yes, and
+	// 0 otherwise.
+	EvidenceLine int `json:"evidence_line" jsonschema:"minimum=0"`
+	// Error is what went wrong when Status is provider_failed or
+	// invalid_answer, and empty otherwise.
+	Error string `json:"error"`
+}
+
+// Judgment statuses.
+const (
+	StatusOK            = "ok"
+	StatusNotRun        = "not_run"
+	StatusFailed        = "provider_failed"
+	StatusInvalidAnswer = "invalid_answer"
 )

@@ -167,7 +167,11 @@ func check(ctx context.Context, args []string, dir string, stdout, stderr io.Wri
 	if err != nil {
 		return false, err
 	}
-	res, err := set.Eval(ctx, in, stderr)
+	qs, err := set.Questions(ctx, in)
+	if err != nil {
+		return false, err
+	}
+	res, err := set.Eval(ctx, in, policy.NotRun(qs), stderr)
 	if err != nil {
 		return false, err
 	}

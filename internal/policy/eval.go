@@ -38,27 +38,92 @@ type Result struct {
 	Violations []Violation
 }
 
-// Eval evaluates the policy set against the input. The output of print
-// calls in the policies goes to printTo.
+// Eval evaluates the policy set against the input, whose judgments must be
+// empty, and the judgments: the answers to the policy set's questions. The
+// output of print calls in the policies goes to printTo.
+//
+// deny is taken from an evaluation without the judgments, so that no answer
+// can change it, and warn from one with them. If deny differs between the
+// two, the policy set reads the judgments in deny, and Eval fails.
 //
 // The policy set must declare schema_version, equal to the version of the
 // input, and rule_ids, a set of the IDs of its rules. Every violation must be
 // an object with exactly rule (one of rule_ids), path, line and message.
-func (s *Set) Eval(ctx context.Context, in *input.Input, printTo io.Writer) (*Result, error) {
+func (s *Set) Eval(ctx context.Context, in *input.Input, judgments []input.Judgment, printTo io.Writer) (*Result, error) {
+	if len(in.Judgments) > 0 {
+		return nil, errors.New("the input to evaluate must have no judgments; they are passed apart")
+	}
 	if err := s.checkSchemaVersion(ctx, in); err != nil {
 		return nil, err
 	}
+	if len(judgments) == 0 {
+		// Both evaluations would be the same
+		pkg, err := s.evalPackage(ctx, in, printTo)
+		if err != nil {
+			return nil, err
+		}
+		ids, deny, warn, err := s.diagnostics(pkg, nil)
+		if err != nil {
+			return nil, err
+		}
+		return newResult(ids, deny, warn), nil
+	}
 
+	// The print output comes from the evaluation with the judgments, which
+	// evaluates every rule too
+	pkg0, err := s.evalPackage(ctx, in, io.Discard)
+	if err != nil {
+		return nil, err
+	}
+	ids, deny0, _, err := s.diagnostics(pkg0, nil)
+	if err != nil {
+		return nil, err
+	}
+	with := *in
+	with.Judgments = judgments
+	if err := input.Validate(&with); err != nil {
+		return nil, err
+	}
+	pkg1, err := s.evalPackage(ctx, &with, printTo)
+	if err != nil {
+		return nil, err
+	}
+	_, deny1, warn, err := s.diagnostics(pkg1, ids)
+	if err != nil {
+		return nil, err
+	}
+	if !slices.Equal(deny0, deny1) {
+		return nil, fmt.Errorf("data.%s.deny depends on input.judgments: it reports different violations with them (%d) than without them (%d); judgments may only feed warn", s.entrypoint, len(deny1), len(deny0))
+	}
+	return newResult(ids, deny0, warn), nil
+}
+
+func newResult(ids []string, deny, warn []Violation) *Result {
+	res := &Result{RuleIDs: ids, Violations: slices.Concat(deny, warn)}
+	Sort(res.Violations)
+	return res
+}
+
+// schemaOption type-checks the policies' references to the input against its
+// schema; it does not check the input itself, which input.Validate does.
+func schemaOption() (func(*rego.Rego), error) {
 	var schema any
 	if err := json.Unmarshal(input.Schema(), &schema); err != nil {
 		return nil, err
 	}
 	schemas := ast.NewSchemaSet()
 	schemas.Put(ast.SchemaRootRef, schema)
+	return rego.Schemas(schemas), nil
+}
+
+// evalPackage evaluates the whole entrypoint package.
+func (s *Set) evalPackage(ctx context.Context, in *input.Input, printTo io.Writer) (ast.Object, error) {
+	schemas, err := schemaOption()
+	if err != nil {
+		return nil, err
+	}
 	doc, err := s.eval(ctx, in, "data."+s.entrypoint,
-		// Type-checks the policies' references to the input; it does not
-		// check the input itself, which input.Validate has done
-		rego.Schemas(schemas),
+		schemas,
 		rego.EnablePrintStatements(true),
 		rego.PrintHook(topdown.NewPrintHook(printTo)),
 	)
@@ -72,25 +137,33 @@ func (s *Set) Eval(ctx context.Context, in *input.Input, printTo io.Writer) (*Re
 	if !ok {
 		return nil, fmt.Errorf("data.%s is not a package", s.entrypoint)
 	}
+	return pkg, nil
+}
 
-	ids, err := ruleIDs(pkg.Get(ast.StringTerm("rule_ids")))
-	if err != nil {
-		return nil, fmt.Errorf("data.%s.rule_ids: %w", s.entrypoint, err)
+// diagnostics returns the rule IDs, the deny and the warn violations of the
+// evaluated package, each sorted. With ids given, the violations are checked
+// against them instead of the package's rule_ids.
+func (s *Set) diagnostics(pkg ast.Object, ids []string) ([]string, []Violation, []Violation, error) {
+	if ids == nil {
+		var err error
+		if ids, err = ruleIDs(pkg.Get(ast.StringTerm("rule_ids"))); err != nil {
+			return nil, nil, nil, fmt.Errorf("data.%s.rule_ids: %w", s.entrypoint, err)
+		}
 	}
-	res := &Result{RuleIDs: ids}
+	found := map[string][]Violation{}
 	var errs []error
 	for _, severity := range []string{Deny, Warn} {
 		vs, err := violations(pkg.Get(ast.StringTerm(severity)), severity, ids)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("data.%s.%s: %w", s.entrypoint, severity, err))
 		}
-		res.Violations = append(res.Violations, vs...)
+		Sort(vs)
+		found[severity] = vs
 	}
 	if err := errors.Join(errs...); err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
-	Sort(res.Violations)
-	return res, nil
+	return ids, found[Deny], found[Warn], nil
 }
 
 // checkSchemaVersion evaluates schema_version alone, before the rest of the

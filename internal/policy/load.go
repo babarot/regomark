@@ -33,12 +33,12 @@ type module struct {
 //
 //   - a module outside lib/ is in the entrypoint package itself, not a child
 //     of it, whose rules no query would collect;
-//   - a module outside lib/ defines deny or warn, so that a misspelled rule
-//     name does not drop its rule silently, unless it defines nothing but
-//     schema_version and rule_ids;
+//   - a module outside lib/ defines deny, warn or questions, so that a
+//     misspelled rule name does not drop its rule silently, unless it
+//     defines nothing but schema_version and rule_ids;
 //   - at least one module defines deny or warn;
 //   - a module in lib/ is imported by another loaded module and defines
-//     neither deny nor warn.
+//     none of deny, warn and questions.
 func Load(root, dir, entrypoint string) (*Set, error) {
 	abs := filepath.Join(root, filepath.FromSlash(dir))
 	if real, err := filepath.EvalSymlinks(abs); err == nil {
@@ -128,13 +128,17 @@ func checkPackages(mods []module, dir, entrypoint string) error {
 	for _, m := range mods {
 		name := path.Join(dir, m.rel)
 		pkg := m.m.Package.Path
-		for _, f := range diagnosticFunctions(m.m) {
-			// A function is left out of the package document, so its
-			// violations would never be collected
-			errs = append(errs, fmt.Errorf("%s:%d: %s must be a set of violations, not a function", name, f.Location.Row, f.Head.Ref()))
+		for _, f := range collectedFunctions(m.m) {
+			// A function is left out of the package document, so what it
+			// yields would never be collected
+			what := "violations"
+			if v, _ := f.Head.Ref()[0].Value.(ast.Var); v == questionsRule {
+				what = "questions"
+			}
+			errs = append(errs, fmt.Errorf("%s:%d: %s must be a set of %s, not a function", name, f.Location.Row, f.Head.Ref(), what))
 		}
 		if strings.HasPrefix(m.rel, "lib/") {
-			if defines := definesDiagnostics(m.m, true); len(defines) > 0 {
+			if defines := definesRules(m.m, collectedRules, true); len(defines) > 0 {
 				errs = append(errs, fmt.Errorf("%s: a library module in lib/ must not define %s", name, strings.Join(defines, " or ")))
 			}
 			if !imported(m, mods) {
@@ -146,10 +150,13 @@ func checkPackages(mods []module, dir, entrypoint string) error {
 			errs = append(errs, fmt.Errorf("%s: package %s must be %s: modules outside lib/ belong to the entrypoint package", name, packageName(pkg), packageName(want)))
 			continue
 		}
-		if len(definesDiagnostics(m.m, false)) > 0 {
+		switch {
+		case len(definesRules(m.m, diagnosticRules, false)) > 0:
 			diagnostics++
-		} else if !declarationsOnly(m.m) {
-			errs = append(errs, fmt.Errorf("%s: defines neither deny nor warn", name))
+		case len(definesRules(m.m, []string{questionsRule}, false)) > 0:
+			// Asks questions whose answers another module's warn reads
+		case !declarationsOnly(m.m):
+			errs = append(errs, fmt.Errorf("%s: defines none of deny, warn and questions", name))
 		}
 	}
 	if diagnostics == 0 {
@@ -164,12 +171,21 @@ func packageName(r ast.Ref) string {
 	return strings.TrimPrefix(r.String(), "data.")
 }
 
-// definesDiagnostics returns which of deny and warn the module defines
-// rules for, with defaults left out when countDefaults is false. A default
-// never yields a violation, so it does not make a module a policy (beside a
-// misspelled rule it would make the module look like one); it still makes a
-// library define deny or warn.
-func definesDiagnostics(m *ast.Module, countDefaults bool) []string {
+// The rules regomark collects from the entrypoint package: the violations,
+// and the questions for the judge.
+const questionsRule = "questions"
+
+var (
+	diagnosticRules = []string{"deny", "warn"}
+	collectedRules  = []string{"deny", questionsRule, "warn"}
+)
+
+// definesRules returns which of names the module defines rules for, with
+// defaults left out when countDefaults is false. A default never yields
+// anything, so it does not make a module a policy (beside a misspelled rule
+// it would make the module look like one); it still makes a library define
+// the rule.
+func definesRules(m *ast.Module, names []string, countDefaults bool) []string {
 	var found []string
 	for _, r := range m.Rules {
 		if r.Default && !countDefaults {
@@ -179,7 +195,7 @@ func definesDiagnostics(m *ast.Module, countDefaults bool) []string {
 		if len(ref) == 0 {
 			continue
 		}
-		if v, ok := ref[0].Value.(ast.Var); ok && (v == "deny" || v == "warn") && !slices.Contains(found, string(v)) {
+		if v, ok := ref[0].Value.(ast.Var); ok && slices.Contains(names, string(v)) && !slices.Contains(found, string(v)) {
 			found = append(found, string(v))
 		}
 	}
@@ -208,16 +224,16 @@ func declarationsOnly(m *ast.Module) bool {
 	return true
 }
 
-// diagnosticFunctions returns the rules that define deny or warn as a
-// function.
-func diagnosticFunctions(m *ast.Module) []*ast.Rule {
+// collectedFunctions returns the rules that define deny, warn or questions
+// as a function.
+func collectedFunctions(m *ast.Module) []*ast.Rule {
 	var fs []*ast.Rule
 	for _, r := range m.Rules {
 		ref := r.Head.Ref()
 		if len(ref) == 0 || len(r.Head.Args) == 0 {
 			continue
 		}
-		if v, ok := ref[0].Value.(ast.Var); ok && (v == "deny" || v == "warn") {
+		if v, ok := ref[0].Value.(ast.Var); ok && slices.Contains(collectedRules, string(v)) {
 			fs = append(fs, r)
 		}
 	}
