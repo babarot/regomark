@@ -1,0 +1,6 @@
+documents: docs
+policy: .regomark/policy
+entrypoint: docs
+judge:
+  command: [sh, judge.sh]
+  cache: .cache

@@ -43,6 +43,9 @@ func (s *Set) Questions(ctx context.Context, in *input.Input) ([]Question, error
 	if len(in.Judgments) > 0 {
 		return nil, errors.New("the input to ask about must have no judgments")
 	}
+	if err := s.checkSchemaVersion(ctx, in); err != nil {
+		return nil, err
+	}
 	schemas, err := schemaOption()
 	if err != nil {
 		return nil, err

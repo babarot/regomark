@@ -1,0 +1,49 @@
+{
+  "schema_version": 2,
+  "root": ".",
+  "documents": [
+    {
+      "path": "docs/adr.md",
+      "name": "adr.md",
+      "blocks": [
+        {
+          "kind": "heading",
+          "level": 1,
+          "line": 1,
+          "end_line": 1,
+          "text": "ADR",
+          "lang": ""
+        },
+        {
+          "kind": "heading",
+          "level": 2,
+          "line": 3,
+          "end_line": 3,
+          "text": "Decision",
+          "lang": ""
+        },
+        {
+          "kind": "paragraph",
+          "level": 0,
+          "line": 5,
+          "end_line": 5,
+          "text": "Use `Store.Get`.",
+          "lang": ""
+        }
+      ],
+      "links": []
+    }
+  ],
+  "judgments": [
+    {
+      "id": "spec-detail",
+      "path": "docs/adr.md",
+      "line": 3,
+      "status": "ok",
+      "verdict": "yes",
+      "reason": "It names Store.Get.",
+      "evidence_line": 5,
+      "error": ""
+    }
+  ]
+}

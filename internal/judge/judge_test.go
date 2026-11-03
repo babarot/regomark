@@ -307,3 +307,70 @@ func TestTail(t *testing.T) {
 		t.Errorf("tail = %q", got)
 	}
 }
+
+func TestExport(t *testing.T) {
+	q := question(t, "q", 2)
+	out, err := Export([]policy.Question{q}, map[string][]byte{"docs/a.md": []byte(src)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	prompt, _, _ := Prompt(q, []byte(src))
+	want := ExportedQuestion{Key: Key(prompt), ID: "q", Path: "docs/a.md", Line: 3, Prompt: prompt}
+	if out.PromptVersion != PromptVersion || string(out.AnswerSchema) != AnswerSchema || !reflect.DeepEqual(out.Questions, []ExportedQuestion{want}) {
+		t.Errorf("Export = %+v", out)
+	}
+	empty, err := Export(nil, nil)
+	if err != nil || empty.Questions == nil {
+		t.Errorf("Export(nil) = %+v, %v; want an empty, non-nil list", empty, err)
+	}
+}
+
+func TestFromFile(t *testing.T) {
+	sources := map[string][]byte{"docs/a.md": []byte(src)}
+	yes, other, missing := question(t, "yes", 2), question(t, "bad", 3), question(t, "missing", 0)
+	keyOf := func(q policy.Question) string {
+		p, _, _ := Prompt(q, []byte(src))
+		return Key(p)
+	}
+	file := fmt.Sprintf(`{"answers": [
+		{"key": %q, "verdict": "yes", "reason": "names Store.Get", "evidence_line": 5},
+		{"key": %q, "verdict": "yes", "reason": "far", "evidence_line": 1},
+		{"key": "sha256:stale", "verdict": "no", "reason": "old", "evidence_line": 0}
+	]}`, keyOf(yes), keyOf(other))
+	js, stats, err := FromFile([]policy.Question{yes, other, missing}, sources, []byte(file), "answers.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []input.Judgment{
+		{ID: "yes", Path: "docs/a.md", Line: 3, Status: input.StatusOK, Verdict: "yes", Reason: "names Store.Get", EvidenceLine: 5},
+		{ID: "bad", Path: "docs/a.md", Line: 3, Status: input.StatusInvalidAnswer, Error: "evidence_line 1 is not a line that was sent"},
+		{ID: "missing", Path: "docs/a.md", Line: 3, Status: input.StatusFailed, Error: "no answer in answers.json"},
+	}
+	if !reflect.DeepEqual(js, want) {
+		t.Errorf("judgments:\n got %+v\nwant %+v", js, want)
+	}
+	if stats != (FileStats{Questions: 3, Answered: 1, Failed: 2, Unmatched: 1}) {
+		t.Errorf("stats = %+v", stats)
+	}
+}
+
+func TestFromFileErrors(t *testing.T) {
+	q := question(t, "q", 2)
+	sources := map[string][]byte{"docs/a.md": []byte(src)}
+	tests := []struct{ name, file, want string }{
+		{"not JSON", "answers", "answers.json: invalid character"},
+		{"no answers", `{}`, "answers.json: no answers"},
+		{"unknown field", `{"answers": [], "questions": []}`, `unknown field "questions"`},
+		{"answer not an object", `{"answers": [1]}`, "answers[0] is not an object"},
+		{"no key", `{"answers": [{"verdict": "no"}]}`, "answers[0] has no key"},
+		{"key twice", `{"answers": [{"key": "k"}, {"key": "k"}]}`, "more than one answer for k"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, _, err := FromFile([]policy.Question{q}, sources, []byte(tt.file), "answers.json")
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Errorf("error = %v, want one containing %q", err, tt.want)
+			}
+		})
+	}
+}
