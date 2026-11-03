@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.3.0](https://github.com/babarot/regomark/compare/v0.2.0...v0.3.0) - 2026-11-03
+### New Features
+- Print violations grouped by file and colored at a terminal by @babarot in https://github.com/babarot/regomark/pull/11
+### Improvements
+- Print the version only with --version by @babarot in https://github.com/babarot/regomark/pull/14
+
 ## [v0.2.0](https://github.com/babarot/regomark/compare/v0.1.1...v0.2.0) - 2026-11-03
 ### New Features
 - Let policies ask questions whose answers only warn can read by @babarot in https://github.com/babarot/regomark/pull/6
