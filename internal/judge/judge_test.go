@@ -125,6 +125,16 @@ func TestPrompt(t *testing.T) {
 		t.Errorf("prompt:\n%s", prompt)
 	}
 
+	// Blocks given out of order are sent in the order of the source
+	reversed, _, err := Prompt(question(t, "q", 3, 2), []byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ordered, _, _ := Prompt(question(t, "q", 2, 3), []byte(src))
+	if reversed != ordered {
+		t.Errorf("reversed blocks:\n%s\nwant:\n%s", reversed, ordered)
+	}
+
 	// Lines with text between blocks are skipped
 	prompt, _, err = Prompt(question(t, "q", 0, 2), []byte(src))
 	if err != nil {

@@ -5,11 +5,14 @@ package judge
 
 import (
 	"bytes"
+	"cmp"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"slices"
 	"strings"
 
+	"github.com/babarot/regomark/internal/input"
 	"github.com/babarot/regomark/internal/policy"
 )
 
@@ -48,13 +51,16 @@ Reply with only a JSON object that matches the JSON Schema below. When verdict i
 // source is src, and the line numbers it sends. Each block is sent as its
 // lines in the source, from its line to its end line, numbered. Between two
 // blocks, blank lines are sent as they are, and a line of "..." stands for
-// skipped lines that are not all blank.
+// skipped lines that are not all blank. The blocks are sent in the order of
+// the source, whatever order the policy gave them in.
 func Prompt(q policy.Question, src []byte) (string, []int, error) {
 	lines := splitLines(src)
+	blocks := slices.Clone(q.Blocks)
+	slices.SortStableFunc(blocks, func(a, b input.Block) int { return cmp.Compare(a.Line, b.Line) })
 	var body strings.Builder
 	var sent []int
 	prev := 0
-	for _, b := range q.Blocks {
+	for _, b := range blocks {
 		if b.Line < 1 || b.EndLine < b.Line || b.EndLine > len(lines) {
 			return "", nil, fmt.Errorf("%s: the block at line %d runs to line %d, past the end of the source", q.Path, b.Line, b.EndLine)
 		}
