@@ -21,6 +21,10 @@ type Input struct {
 	// by path, id and line. They are empty while the questions and deny are
 	// evaluated, so that neither depends on them.
 	Judgments []Judgment `json:"judgments"`
+
+	// Sources are the documents as read, by path. They are not part of the
+	// input the policies see; a judge is sent lines of them.
+	Sources map[string][]byte `json:"-"`
 }
 
 // Document is one Markdown document.

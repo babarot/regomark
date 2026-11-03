@@ -1,0 +1,7 @@
+documents: docs
+policy: .regomark/policy
+entrypoint: docs
+judge:
+  command: [sh, judge.sh]
+  cache: .cache
+  max_questions: 1

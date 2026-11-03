@@ -9,13 +9,14 @@ It is under development.
 ## Usage
 
 ```
-regomark check [--config .regomark.yaml] [--format text|github|json]
+regomark check [--config .regomark.yaml] [--format text|github|json] [--judge | --no-judge]
 regomark dump [--config .regomark.yaml]
 regomark version   # or --version
 ```
 
 - `check` evaluates the policies against the documents and prints the violations. It exits 0 when there is no deny, 1 when there is one, and 2 when the check cannot be done: an invalid configuration, no documents, no policy, a policy that breaks the rules below, a violation or a question that is not shaped as one, or a `deny` that reads the judgments.
 - `dump` prints the input the policies receive, as JSON, for writing policy tests.
+- `--judge` asks the policies' questions (see Questions below) with `judge.command`; `--no-judge` does not, even with `REGOMARK_JUDGE=on`.
 - `--format`: `text` prints `path:line: [rule] message` (a warn as `path:line: warning: [rule] message`), `github` prints workflow commands that GitHub Actions shows as annotations (`::error` for a deny, `::warning` for a warn), and `json` prints an array of violations.
 
 regomark runs in a git repository. Every path, `--config` included, is relative to the repository root (`git rev-parse --show-toplevel`), so it gives the same result from any directory in the repository.
@@ -30,6 +31,12 @@ policy: .regomark/policy     # the directory of the rego policies
 entrypoint: adr              # the package of deny and warn (data.adr)
 skip_rules: []               # rule IDs whose violations are dropped
 exclude: []                  # documents not to check, as path.Match patterns (docs/adr/000-*.md)
+judge:                       # how to ask the policies' questions; optional
+  command: [sh, -c, 'claude -p --output-format json --model sonnet --tools "" --json-schema "$REGOMARK_ANSWER_SCHEMA"']
+  parallel: 4                # commands at once
+  timeout: 120s              # for each command
+  cache: ""                  # the answers already given (default: regomark/judge in the user cache directory)
+  max_questions: 200         # more questions than this exits 2, a limit on what a run costs
 ```
 
 An unknown key, or a rule ID in `skip_rules` that the policy set does not declare, exits 2. Documents that git ignores are not checked, and one that cannot be read, such as a broken symbolic link, exits 2.
@@ -88,7 +95,17 @@ warn contains {"rule": "ADR015", "path": j.path, "line": j.evidence_line, "messa
 }
 ```
 
-regomark does not ask a judge yet: every question is evaluated and checked, and its judgment is `not_run`.
+Every question is evaluated and checked on every run, but asked only when the user says so: with `--judge`, or with `REGOMARK_JUDGE=on` in the environment (`off` or unset does not, `--no-judge` overrides it). Nothing in the repository turns judging on, so checking a repository never runs a command it names unasked. Otherwise, and when the repository sets no `judge.command` under `REGOMARK_JUDGE=on`, every judgment is `not_run`.
+
+When asked, each question goes to `judge.command`, run in the repository root without a shell:
+
+- its standard input is a prompt with the question and the question's blocks as they are in the source, each line numbered, asking for a JSON answer `{"verdict": "yes" | "no", "reason": "...", "evidence_line": N}`;
+- its environment has that answer's JSON Schema as `REGOMARK_ANSWER_SCHEMA`;
+- its standard output is the answer, or the result object of `claude -p --output-format json`, whose `structured_output` (or `result`) holds it.
+
+A `yes` must rest on a line that was sent. A command that fails or times out makes the judgment `provider_failed`, and an answer not shaped as one `invalid_answer`; neither changes the exit code. Answers are cached by the prompt and the command, so a question is asked again only when what it sends changes.
+
+The judge reads the documents, which may carry instructions of their own; give it no way to change the repository it judges, as `--tools ""` does for claude above.
 
 ### Input
 

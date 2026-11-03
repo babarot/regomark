@@ -24,6 +24,8 @@ func isolateGit(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", home)
 	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
 	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	// Nor may the user's choice to judge
+	t.Setenv("REGOMARK_JUDGE", "")
 }
 
 // TestFixtures runs regomark on each directory in testdata/fixtures:
@@ -33,6 +35,7 @@ func isolateGit(t *testing.T) {
 //	         a symbolic link is copied as a link
 //	args     the arguments, separated by spaces (default: check)
 //	cwd      the directory to run in, relative to the repository (default: root)
+//	env      environment variables to set, a KEY=VALUE per line
 //	stdout   the expected standard output
 //	stderr   the expected standard error
 //	exit     the expected exit code
@@ -58,6 +61,13 @@ func TestFixtures(t *testing.T) {
 			args := []string{"check"}
 			if b, err := os.ReadFile(filepath.Join(dir, "args")); err == nil {
 				args = strings.Fields(string(b))
+			}
+			if b, err := os.ReadFile(filepath.Join(dir, "env")); err == nil {
+				for line := range strings.Lines(string(b)) {
+					if k, v, ok := strings.Cut(strings.TrimSpace(line), "="); ok {
+						t.Setenv(k, v)
+					}
+				}
 			}
 			cwd := root
 			if b, err := os.ReadFile(filepath.Join(dir, "cwd")); err == nil {

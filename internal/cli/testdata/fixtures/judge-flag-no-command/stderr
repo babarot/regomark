@@ -1,0 +1,1 @@
+regomark: --judge: .regomark.yaml sets no judge.command
