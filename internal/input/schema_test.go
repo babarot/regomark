@@ -54,3 +54,15 @@ func TestValidate(t *testing.T) {
 		})
 	}
 }
+
+func TestSchemaLeavesOutSources(t *testing.T) {
+	// The sources are for the judge, not part of the input
+	if bytes.Contains(bytes.ToLower(Schema()), []byte("sources")) {
+		t.Errorf("the schema has the sources:\n%s", Schema())
+	}
+	in := valid()
+	in.Sources = map[string][]byte{"a.md": []byte("# A\n")}
+	if err := Validate(in); err != nil {
+		t.Error(err)
+	}
+}

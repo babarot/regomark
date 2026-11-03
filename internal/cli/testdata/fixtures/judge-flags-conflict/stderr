@@ -1,0 +1,1 @@
+regomark: --judge and --no-judge cannot be given together

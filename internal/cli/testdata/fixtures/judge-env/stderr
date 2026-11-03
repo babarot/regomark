@@ -1,0 +1,2 @@
+regomark: judge: sh judge.sh
+regomark: judge: 1 questions, 0 cached, 1 asked, 0 failed

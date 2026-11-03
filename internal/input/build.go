@@ -21,7 +21,7 @@ func Build(root string, cfg *config.Config) (*Input, error) {
 	if err != nil {
 		return nil, err
 	}
-	in := &Input{SchemaVersion: SchemaVersion, Root: ".", Documents: []Document{}, Judgments: []Judgment{}}
+	in := &Input{SchemaVersion: SchemaVersion, Root: ".", Documents: []Document{}, Judgments: []Judgment{}, Sources: map[string][]byte{}}
 	for _, p := range paths {
 		src, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(p)))
 		if err != nil {
@@ -32,6 +32,7 @@ func Build(root string, cfg *config.Config) (*Input, error) {
 			return nil, fmt.Errorf("%s: %w", p, err)
 		}
 		in.Documents = append(in.Documents, Document{Path: p, Name: path.Base(p), Blocks: blocks, Links: links})
+		in.Sources[p] = src
 	}
 	if err := resolveLinks(root, in.Documents); err != nil {
 		return nil, err
