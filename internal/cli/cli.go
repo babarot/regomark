@@ -31,7 +31,7 @@ const (
 )
 
 const usage = `Usage:
-  regomark check [--config .regomark.yaml] [--format text|github|json] [--judge | --no-judge | --judgments FILE]
+  regomark check [--config .regomark.yaml] [--format text|pretty|github|json] [--judge | --no-judge | --judgments FILE]
   regomark dump [--config .regomark.yaml] [--judge | --judgments FILE]
   regomark questions [--config .regomark.yaml]
   regomark version (or --version)
@@ -162,12 +162,19 @@ func loadConfig(root, name string) (*config.Config, error) {
 
 func check(ctx context.Context, args []string, dir string, stdout, stderr io.Writer) (bool, error) {
 	flags, cfgPath := newFlagSet("check", stderr)
-	format := flags.String("format", "text", "output format: "+strings.Join(report.Formats, ", "))
+	format := flags.String("format", "", "output format: "+strings.Join(report.Formats, ", ")+" (default pretty at a terminal, text otherwise)")
 	judgeFlag := flags.Bool("judge", false, "ask the policies' questions with judge.command")
 	noJudge := flags.Bool("no-judge", false, "do not ask them, even with REGOMARK_JUDGE=on")
 	file := flags.String("judgments", "", "take the answers from `FILE`, written for regomark questions")
 	if err := parse(flags, args); err != nil {
 		return false, err
+	}
+	width, tty := terminal(stdout)
+	if *format == "" {
+		*format = "text"
+		if tty {
+			*format = "pretty"
+		}
 	}
 	if !slices.Contains(report.Formats, *format) {
 		return false, fmt.Errorf("--format: unknown format %q (want one of %s)", *format, strings.Join(report.Formats, ", "))
@@ -199,7 +206,7 @@ func check(ctx context.Context, args []string, dir string, stdout, stderr io.Wri
 	if err := res.Skip(cfg.SkipRules); err != nil {
 		return false, err
 	}
-	if err := report.Write(stdout, *format, res.Violations); err != nil {
+	if err := report.Write(colored(stdout), *format, res.Violations, width); err != nil {
 		return false, fmt.Errorf("output: %w", err)
 	}
 	return res.Denied(), nil
@@ -287,12 +294,12 @@ func ask(ctx context.Context, mode judgingMode, root, cfgPath string, cfg *confi
 		Timeout:  cfg.Judge.TimeoutDuration,
 		CacheDir: cache,
 	}
-	fmt.Fprintf(stderr, "regomark: judge: %s\n", quote(cfg.Judge.Command))
+	note(stderr, "regomark: judge: %s", quote(cfg.Judge.Command))
 	js, stats, err := j.Run(ctx, qs, in.Sources)
 	if err != nil {
 		return nil, fmt.Errorf("judge: %w", err)
 	}
-	fmt.Fprintf(stderr, "regomark: judge: %d questions, %d cached, %d asked, %d failed\n", stats.Questions, stats.Cached, stats.Asked, stats.Failed)
+	note(stderr, "regomark: judge: %d questions, %d cached, %d asked, %d failed", stats.Questions, stats.Cached, stats.Asked, stats.Failed)
 	if stats.CacheErr != nil {
 		fmt.Fprintf(stderr, "regomark: judge: answers not cached: %v\n", stats.CacheErr)
 	}
@@ -314,7 +321,7 @@ func fromFile(root, file string, in *input.Input, qs []policy.Question, stderr i
 	if err != nil {
 		return nil, fmt.Errorf("--judgments: %w", err)
 	}
-	fmt.Fprintf(stderr, "regomark: judge: %d questions, %d answered from %s, %d failed\n", stats.Questions, stats.Answered, file, stats.Failed)
+	note(stderr, "regomark: judge: %d questions, %d answered from %s, %d failed", stats.Questions, stats.Answered, file, stats.Failed)
 	if stats.Unmatched > 0 {
 		fmt.Fprintf(stderr, "regomark: judge: %d answers in %s match no question; were the documents or the policies changed after regomark questions?\n", stats.Unmatched, file)
 	}

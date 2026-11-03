@@ -9,7 +9,7 @@ It is under development.
 ## Usage
 
 ```
-regomark check [--config .regomark.yaml] [--format text|github|json] [--judge | --no-judge | --judgments FILE]
+regomark check [--config .regomark.yaml] [--format text|pretty|github|json] [--judge | --no-judge | --judgments FILE]
 regomark dump [--config .regomark.yaml] [--judge | --judgments FILE]
 regomark questions [--config .regomark.yaml]
 regomark version   # or --version
@@ -19,7 +19,7 @@ regomark version   # or --version
 - `dump` prints the input the policies receive, as JSON, for writing policy tests. With `--judge` or `--judgments`, the judgments are in it; `REGOMARK_JUDGE` does not change what it prints.
 - `questions` prints the policies' questions with the prompts `judge.command` would get, as JSON, for a judge that answers them all at once.
 - `--judge` asks the policies' questions (see [Judging what a document means](#judging-what-a-document-means)) with `judge.command`; `--no-judge` does not, even with `REGOMARK_JUDGE=on`; `--judgments FILE` takes the answers from a file instead.
-- `--format`: `text` prints `path:line: [rule] message` (a warn as `path:line: warning: [rule] message`), `github` prints workflow commands that GitHub Actions shows as annotations (`::error` for a deny, `::warning` for a warn), and `json` prints an array of violations.
+- `--format`: `pretty`, the default at a terminal, groups the violations by file, puts each message under its line, severity and rule, wraps it to the width of the terminal, and ends with a count; `text`, the default otherwise, prints `path:line: [rule] message` (a warn as `path:line: warning: [rule] message`), `github` prints workflow commands that GitHub Actions shows as annotations (`::error` for a deny, `::warning` for a warn), and `json` prints an array of violations. Colors are used only at a terminal, and not when `NO_COLOR` is set to anything but empty ([no-color.org](https://no-color.org/)).
 
 regomark runs in a git repository. Every path, `--config` included, is relative to the repository root (`git rev-parse --show-toplevel`), so it gives the same result from any directory in the repository.
 

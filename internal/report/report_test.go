@@ -36,7 +36,7 @@ func TestWrite(t *testing.T) {
 	}
 	for _, tt := range tests {
 		var b bytes.Buffer
-		if err := Write(&b, tt.format, tt.vs); err != nil {
+		if err := Write(&b, tt.format, tt.vs, 0); err != nil {
 			t.Fatal(err)
 		}
 		if b.String() != tt.want {
@@ -46,7 +46,7 @@ func TestWrite(t *testing.T) {
 }
 
 func TestWriteUnknownFormat(t *testing.T) {
-	if err := Write(&bytes.Buffer{}, "xml", nil); err == nil {
+	if err := Write(&bytes.Buffer{}, "xml", nil, 0); err == nil {
 		t.Error("Write accepted xml")
 	}
 }

@@ -1,1 +1,1 @@
-regomark: --format: unknown format "xml" (want one of text, github, json)
+regomark: --format: unknown format "xml" (want one of text, pretty, github, json)
