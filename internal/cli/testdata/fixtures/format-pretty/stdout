@@ -1,0 +1,7 @@
+docs/doc.md
+  1  warning  HEADING
+     h1 Title: with, punctuation 100%
+  3  error    BROKEN
+     missing gone.md -> docs/gone.md
+
+✖ 2 problems (1 error, 1 warning)

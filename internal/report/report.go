@@ -11,13 +11,16 @@ import (
 )
 
 // Formats are the names --format accepts.
-var Formats = []string{"text", "github", "json"}
+var Formats = []string{"text", "pretty", "github", "json"}
 
-// Write writes the violations, already sorted, in the format.
-func Write(w io.Writer, format string, vs []policy.Violation) error {
+// Write writes the violations, already sorted, in the format; pretty
+// wraps the messages to width cells, or not at all if width is 0.
+func Write(w io.Writer, format string, vs []policy.Violation, width int) error {
 	switch format {
 	case "text":
 		return text(w, vs)
+	case "pretty":
+		return Pretty(w, vs, width)
 	case "github":
 		return github(w, vs)
 	case "json":
