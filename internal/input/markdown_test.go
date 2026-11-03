@@ -40,21 +40,55 @@ func TestParseBlocks(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []Block{
-		{Kind: "heading", Level: 1, Line: 1, Text: "ATX `code`"},
-		{Kind: "code", Line: 3, Text: "# not a heading\n", Lang: "sh"},
-		{Kind: "heading", Level: 2, Line: 7, Text: "Setext"},
-		{Kind: "paragraph", Line: 10, Text: "one two\nthree\nfour"},
-		{Kind: "list", Line: 14, Text: "a\nb"},
-		{Kind: "quote", Line: 17, Text: "q"},
-		{Kind: "rule", Line: 19},
-		{Kind: "html", Line: 21, Text: "<p>\nhi\n</p>\n"},
-		{Kind: "table", Line: 25, Text: "h1 | h2\nc1 | c2"},
+		{Kind: "heading", Level: 1, Line: 1, EndLine: 1, Text: "ATX `code`"},
+		{Kind: "code", Line: 3, EndLine: 5, Text: "# not a heading\n", Lang: "sh"},
+		{Kind: "heading", Level: 2, Line: 7, EndLine: 8, Text: "Setext"},
+		{Kind: "paragraph", Line: 10, EndLine: 12, Text: "one two\nthree\nfour"},
+		{Kind: "list", Line: 14, EndLine: 15, Text: "a\nb"},
+		{Kind: "quote", Line: 17, EndLine: 17, Text: "q"},
+		{Kind: "rule", Line: 19, EndLine: 19},
+		{Kind: "html", Line: 21, EndLine: 23, Text: "<p>\nhi\n</p>\n"},
+		// Ends before the reference definition, which is not a block
+		{Kind: "table", Line: 25, EndLine: 27, Text: "h1 | h2\nc1 | c2"},
 	}
 	if !reflect.DeepEqual(blocks, want) {
 		t.Errorf("blocks:\n got %+v\nwant %+v", blocks, want)
 	}
 	if len(links) != 0 {
 		t.Errorf("links = %+v, want none: a definition alone is not a link", links)
+	}
+}
+
+func TestParseEndLine(t *testing.T) {
+	tests := []struct {
+		name string
+		src  string
+		want [][2]int // line and end line of each block
+	}{
+		{"loose list", "- a\n\n- b\n  more\n\n\npara\n", [][2]int{{1, 4}, {7, 7}}},
+		{"unclosed fence", "```\ncode\n\n", [][2]int{{1, 2}}},
+		{"no final newline", "# h\n\ntext", [][2]int{{1, 1}, {3, 3}}},
+		{"blank lines at the end", "text\n\n\n", [][2]int{{1, 1}}},
+		{"lazy continuation", "> quote\nlazy\n\nnext\n", [][2]int{{1, 2}, {4, 4}}},
+		{"indented code", "    a\n\n    b\n\npara\n", [][2]int{{1, 3}, {5, 5}}},
+		{"nested", "> - a\n>\n>   ```\n>   x\n>   ```\n", [][2]int{{1, 5}}},
+		{"definition between", "para\n\n[r]: x.md\n\n# h\n", [][2]int{{1, 1}, {5, 5}}},
+		{"crlf", "a\r\nb\r\n\r\nc\r\n", [][2]int{{1, 2}, {4, 4}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			blocks, _, err := Parse([]byte(tt.src))
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got [][2]int
+			for _, b := range blocks {
+				got = append(got, [2]int{b.Line, b.EndLine})
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("lines = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 

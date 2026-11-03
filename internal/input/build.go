@@ -21,7 +21,7 @@ func Build(root string, cfg *config.Config) (*Input, error) {
 	if err != nil {
 		return nil, err
 	}
-	in := &Input{SchemaVersion: SchemaVersion, Root: ".", Documents: []Document{}}
+	in := &Input{SchemaVersion: SchemaVersion, Root: ".", Documents: []Document{}, Judgments: []Judgment{}}
 	for _, p := range paths {
 		src, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(p)))
 		if err != nil {

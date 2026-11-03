@@ -14,7 +14,7 @@ import (
 
 const schemaRego = `package docs
 
-schema_version := 1
+schema_version := 2
 
 rule_ids := {"A", "B"}
 `
@@ -38,9 +38,9 @@ func write(t *testing.T, files map[string]string) string {
 func testInput() *input.Input {
 	return &input.Input{SchemaVersion: input.SchemaVersion, Root: ".", Documents: []input.Document{{
 		Path: "docs/a.md", Name: "a.md",
-		Blocks: []input.Block{{Kind: "heading", Level: 1, Line: 1, Text: "A"}, {Kind: "paragraph", Line: 3, Text: "x"}},
+		Blocks: []input.Block{{Kind: "heading", Level: 1, Line: 1, EndLine: 1, Text: "A"}, {Kind: "paragraph", Line: 3, EndLine: 3, Text: "x"}},
 		Links:  []input.Link{},
-	}}}
+	}}, Judgments: []input.Judgment{}}
 }
 
 func TestLoadPackageRules(t *testing.T) {
@@ -62,10 +62,10 @@ func TestLoadPackageRules(t *testing.T) {
 		}, nil},
 		{"child package", map[string]string{"schema.rego": schemaRego, "x.rego": "package docs.x\ndeny contains 1 if true\n"},
 			[]string{"policy/x.rego: package docs.x must be docs"}},
-		{"other package", map[string]string{"schema.rego": "package adr\nschema_version := 1\n"},
+		{"other package", map[string]string{"schema.rego": "package adr\nschema_version := 2\n"},
 			[]string{"policy/schema.rego: package adr must be docs"}},
 		{"neither deny nor warn", map[string]string{"schema.rego": schemaRego, "x.rego": "package docs\ndenies contains 1 if true\n"},
-			[]string{"policy/x.rego: defines neither deny nor warn"}},
+			[]string{"policy/x.rego: defines none of deny, warn and questions"}},
 		{"library defines deny and warn", map[string]string{
 			"rules.rego":    "package docs\nimport data.lib.util\ndeny contains 1 if util.x\n",
 			"lib/util.rego": "package lib.util\nx := true\ndeny contains 1 if true\nwarn contains 1 if true\n",
@@ -80,20 +80,20 @@ func TestLoadPackageRules(t *testing.T) {
 		}, []string{"policy/lib/util.rego: no other module imports the library package lib.util"}},
 		{"misspelled rule beside the declarations", map[string]string{
 			"schema.rego": schemaRego + "denies contains 1 if true\n", "rules.rego": "package docs\ndeny contains 1 if false\n",
-		}, []string{"policy/schema.rego: defines neither deny nor warn"}},
+		}, []string{"policy/schema.rego: defines none of deny, warn and questions"}},
 		{"declarations in any file name", map[string]string{
 			"ids.rego": schemaRego, "rules.rego": "package docs\ndeny contains 1 if false\n",
 		}, nil},
 		{"default deny beside a misspelled rule", map[string]string{
 			"schema.rego": schemaRego, "x.rego": "package docs\ndefault deny := set()\ndenies contains 1 if true\n",
-		}, []string{"policy/x.rego: defines neither deny nor warn"}},
+		}, []string{"policy/x.rego: defines none of deny, warn and questions"}},
 		{"declarations only", map[string]string{"schema.rego": schemaRego},
 			[]string{"no module in policy defines deny or warn in package docs"}},
 		{"deny as a function", map[string]string{"schema.rego": schemaRego, "x.rego": "package docs\n\ndeny(doc) := 1 if doc\n"},
 			[]string{"policy/x.rego:3: deny must be a set of violations, not a function"}},
 		{"every error at once", map[string]string{
 			"a.rego": "package a\n", "b.rego": "package docs\n",
-		}, []string{"package a must be docs", "b.rego: defines neither"}},
+		}, []string{"package a must be docs", "b.rego: defines none"}},
 		{"no files", map[string]string{"x_test.rego": "package docs_test\n"}, []string{"no .rego files in policy"}},
 		{"syntax error", map[string]string{"x.rego": "package docs\ndeny contains if\n"}, []string{"policy/x.rego"}},
 	}
@@ -186,7 +186,7 @@ warn contains {"rule": "B", "path": "docs/a.md", "line": 1, "message": "w"} if p
 		t.Fatal(err)
 	}
 	var printed bytes.Buffer
-	res, err := set.Eval(context.Background(), testInput(), &printed)
+	res, err := set.Eval(context.Background(), testInput(), nil, &printed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -223,11 +223,11 @@ func TestEvalErrors(t *testing.T) {
 	tests := []struct {
 		name, schema, rules, want string
 	}{
-		{"schema version mismatch", "package docs\nschema_version := 2\nrule_ids := {\"A\"}\n", "", "written for input schema version 2"},
+		{"schema version mismatch", "package docs\nschema_version := 1\nrule_ids := {\"A\"}\n", "", "written for input schema version 1"},
 		{"schema version not a number", "package docs\nschema_version := \"1\"\nrule_ids := {\"A\"}\n", "", "not an integer"},
 		{"no schema version", "package docs\nrule_ids := {\"A\"}\n", "", "does not define schema_version"},
-		{"no rule IDs", "package docs\nschema_version := 1\n", "", "rule_ids: not defined"},
-		{"rule IDs not strings", "package docs\nschema_version := 1\nrule_ids := {1}\n", "", "must be a set of non-empty strings"},
+		{"no rule IDs", "package docs\nschema_version := 2\n", "", "rule_ids: not defined"},
+		{"rule IDs not strings", "package docs\nschema_version := 2\nrule_ids := {1}\n", "", "must be a set of non-empty strings"},
 		{"not an object", schemaRego, `deny contains "x" if true`, "must be an object"},
 		{"missing message", schemaRego, `deny contains {"rule": "A", "path": "a", "line": 1} if true`, "message is missing"},
 		{"empty path", schemaRego, `deny contains {"rule": "A", "path": "", "line": 1, "message": "m"} if true`, "path must be a non-empty string"},
@@ -250,7 +250,7 @@ func TestEvalErrors(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, err = set.Eval(context.Background(), testInput(), &bytes.Buffer{})
+			_, err = set.Eval(context.Background(), testInput(), nil, &bytes.Buffer{})
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Errorf("error = %v, want one containing %q", err, tt.want)
 			}

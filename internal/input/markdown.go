@@ -32,10 +32,52 @@ func Parse(src []byte) ([]Block, []Link, error) {
 		if err != nil {
 			return nil, nil, err
 		}
+		b.EndLine = p.endLine(b.Line, n.NextSibling())
 		blocks = append(blocks, b)
 		links = append(links, p.links(n, b.Line)...)
 	}
 	return blocks, links, nil
+}
+
+// endLine returns the last line of the top-level block starting at start,
+// given the top-level node after it (nil for the last one). Top-level blocks
+// follow each other with only blank lines between them, so the block ends at
+// the last line that is not blank before the next node starts. goldmark keeps
+// no position for the end of a block, a closing fence for one, so the end is
+// found from where the next one starts.
+func (p *parser) endLine(start int, next gast.Node) int {
+	end := len(p.lineStarts) // the last line, or the empty one after a final newline
+	for ; next != nil; next = next.NextSibling() {
+		if l, ok := p.startLine(next); ok {
+			end = l - 1
+			break
+		}
+	}
+	for end > start && p.blank(end) {
+		end--
+	}
+	return end
+}
+
+// startLine returns the line a node starts at, if it has a position.
+func (p *parser) startLine(n gast.Node) (int, bool) {
+	if n.Pos() >= 0 {
+		return p.line(n.Pos()), true
+	}
+	if n.Type() == gast.TypeBlock && n.Lines().Len() > 0 {
+		return p.line(n.Lines().At(0).Start), true
+	}
+	return 0, false
+}
+
+// blank reports whether the 1-based line has nothing but white space.
+func (p *parser) blank(line int) bool {
+	start := p.lineStarts[line-1]
+	stop := len(p.src)
+	if line < len(p.lineStarts) {
+		stop = p.lineStarts[line]
+	}
+	return len(bytes.TrimSpace(p.src[start:stop])) == 0
 }
 
 type parser struct {
