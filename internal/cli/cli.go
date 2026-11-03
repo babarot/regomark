@@ -31,15 +31,20 @@ const (
 )
 
 const usage = `Usage:
-  regomark check [--config .regomark.yaml] [--format text|github|json] [--judge | --no-judge]
-  regomark dump [--config .regomark.yaml]
+  regomark check [--config .regomark.yaml] [--format text|github|json] [--judge | --no-judge | --judgments FILE]
+  regomark dump [--config .regomark.yaml] [--judge | --judgments FILE]
+  regomark questions [--config .regomark.yaml]
   regomark version (or --version)
 
 check evaluates the policies against the documents and reports the
 violations; it exits 1 if any is a deny, and 2 if the check cannot be done.
 With --judge, or REGOMARK_JUDGE=on in the environment, it asks the policies'
 questions with judge.command; --no-judge does not, whatever the environment.
-dump prints the input the policies receive, as JSON.
+With --judgments, it takes the answers from FILE instead.
+dump prints the input the policies receive, as JSON; with --judge or
+--judgments, the judgments are in it.
+questions prints the policies' questions with their prompts, as JSON, for a
+judge that writes the answers to a file for --judgments.
 
 Paths, --config included, are relative to the root of the git repository,
 so regomark gives the same result from any directory in it.
@@ -61,7 +66,9 @@ func Run(ctx context.Context, args []string, dir string, stdout, stderr io.Write
 			return ExitDeny
 		}
 	case "dump":
-		err = dump(args[1:], dir, stdout, stderr)
+		err = dump(ctx, args[1:], dir, stdout, stderr)
+	case "questions":
+		err = questions(ctx, args[1:], dir, stdout, stderr)
 	case "version", "--version", "-v":
 		if len(args) > 1 {
 			err = errUsage
@@ -158,13 +165,14 @@ func check(ctx context.Context, args []string, dir string, stdout, stderr io.Wri
 	format := flags.String("format", "text", "output format: "+strings.Join(report.Formats, ", "))
 	judgeFlag := flags.Bool("judge", false, "ask the policies' questions with judge.command")
 	noJudge := flags.Bool("no-judge", false, "do not ask them, even with REGOMARK_JUDGE=on")
+	file := flags.String("judgments", "", "take the answers from `FILE`, written for regomark questions")
 	if err := parse(flags, args); err != nil {
 		return false, err
 	}
 	if !slices.Contains(report.Formats, *format) {
 		return false, fmt.Errorf("--format: unknown format %q (want one of %s)", *format, strings.Join(report.Formats, ", "))
 	}
-	how, err := judging(*judgeFlag, *noJudge, os.Getenv("REGOMARK_JUDGE"))
+	how, err := judging(*judgeFlag, *noJudge, *file, os.Getenv("REGOMARK_JUDGE"))
 	if err != nil {
 		return false, err
 	}
@@ -202,36 +210,54 @@ const (
 	noJudging   = iota
 	judgeByFlag // --judge
 	judgeByEnv  // REGOMARK_JUDGE=on
+	judgeByFile // --judgments FILE
 )
 
-// judging decides whether to ask the questions. Only the user turns it on,
-// with --judge or REGOMARK_JUDGE=on; nothing in the repository can, so that
-// checking a repository never runs a command it names unasked.
-func judging(judgeFlag, noJudge bool, env string) (int, error) {
+type judgingMode struct {
+	how  int
+	file string // with judgeByFile
+}
+
+// judging decides how to answer the questions. Only the user turns judging
+// on, with a flag or REGOMARK_JUDGE=on; nothing in the repository can, so
+// that checking a repository never runs a command it names unasked.
+func judging(judgeFlag, noJudge bool, file, env string) (judgingMode, error) {
+	given := 0
+	for _, b := range []bool{judgeFlag, noJudge, file != ""} {
+		if b {
+			given++
+		}
+	}
 	switch {
-	case judgeFlag && noJudge:
-		return 0, errors.New("--judge and --no-judge cannot be given together")
+	case given > 1:
+		return judgingMode{}, errors.New("give only one of --judge, --no-judge and --judgments")
+	case file != "":
+		return judgingMode{how: judgeByFile, file: file}, nil
 	case judgeFlag:
-		return judgeByFlag, nil
+		return judgingMode{how: judgeByFlag}, nil
 	case noJudge:
-		return noJudging, nil
+		return judgingMode{how: noJudging}, nil
 	}
 	switch env {
 	case "on":
-		return judgeByEnv, nil
+		return judgingMode{how: judgeByEnv}, nil
 	case "off", "":
-		return noJudging, nil
+		return judgingMode{how: noJudging}, nil
 	default:
-		return 0, fmt.Errorf("REGOMARK_JUDGE is %q; set it to on or off, or unset it", env)
+		return judgingMode{}, fmt.Errorf("REGOMARK_JUDGE is %q; set it to on or off, or unset it", env)
 	}
 }
 
-// ask answers the questions as how says, and returns their judgments: not
+// ask answers the questions as mode says, and returns their judgments: not
 // run unless they are asked.
-func ask(ctx context.Context, how int, root, cfgPath string, cfg *config.Config, in *input.Input, qs []policy.Question, stderr io.Writer) ([]input.Judgment, error) {
+func ask(ctx context.Context, mode judgingMode, root, cfgPath string, cfg *config.Config, in *input.Input, qs []policy.Question, stderr io.Writer) ([]input.Judgment, error) {
 	notRun := policy.NotRun(qs)
+	how := mode.how
 	if how == noJudging {
 		return notRun, nil
+	}
+	if how == judgeByFile {
+		return fromFile(root, mode.file, in, qs, stderr)
 	}
 	if cfg.Judge.Command == nil {
 		if how == judgeByFlag {
@@ -273,6 +299,37 @@ func ask(ctx context.Context, how int, root, cfgPath string, cfg *config.Config,
 	return js, nil
 }
 
+// fromFile answers the questions from a file of answers, at a path relative
+// to root unless absolute.
+func fromFile(root, file string, in *input.Input, qs []policy.Question, stderr io.Writer) ([]input.Judgment, error) {
+	p := file
+	if !filepath.IsAbs(p) {
+		p = filepath.Join(root, filepath.FromSlash(file))
+	}
+	data, err := os.ReadFile(p)
+	if err != nil {
+		return nil, fmt.Errorf("--judgments: %s: %w", file, unwrapPath(err))
+	}
+	js, stats, err := judge.FromFile(qs, in.Sources, data, file)
+	if err != nil {
+		return nil, fmt.Errorf("--judgments: %w", err)
+	}
+	fmt.Fprintf(stderr, "regomark: judge: %d questions, %d answered from %s, %d failed\n", stats.Questions, stats.Answered, file, stats.Failed)
+	if stats.Unmatched > 0 {
+		fmt.Fprintf(stderr, "regomark: judge: %d answers in %s match no question; were the documents or the policies changed after regomark questions?\n", stats.Unmatched, file)
+	}
+	return js, nil
+}
+
+// unwrapPath drops the path from a file system error, which the message
+// names already as the user gave it.
+func unwrapPath(err error) error {
+	if pe, ok := errors.AsType[*fs.PathError](err); ok {
+		return pe.Err
+	}
+	return err
+}
+
 // cacheDir returns the directory of cached answers: dir as configured,
 // relative to root unless absolute, or regomark/judge in the user cache
 // directory. The answers are keyed by what was asked, so repositories can
@@ -307,19 +364,72 @@ func quote(args []string) string {
 	return b.String()
 }
 
-func dump(args []string, dir string, stdout, stderr io.Writer) error {
+func dump(ctx context.Context, args []string, dir string, stdout, stderr io.Writer) error {
 	flags, cfgPath := newFlagSet("dump", stderr)
+	judgeFlag := flags.Bool("judge", false, "ask the policies' questions with judge.command, and include the judgments")
+	file := flags.String("judgments", "", "take the answers from `FILE`, and include the judgments")
 	if err := parse(flags, args); err != nil {
 		return err
 	}
-	_, _, in, err := load(dir, *cfgPath)
+	// Not REGOMARK_JUDGE: what dump prints does not depend on the environment
+	mode, err := judging(*judgeFlag, false, *file, "")
 	if err != nil {
 		return err
 	}
-	enc := json.NewEncoder(stdout)
+	root, cfg, in, err := load(dir, *cfgPath)
+	if err != nil {
+		return err
+	}
+	if mode.how != noJudging {
+		set, err := policy.Load(root, cfg.Policy, cfg.Entrypoint)
+		if err != nil {
+			return err
+		}
+		qs, err := set.Questions(ctx, in)
+		if err != nil {
+			return err
+		}
+		js, err := ask(ctx, mode, root, *cfgPath, cfg, in, qs, stderr)
+		if err != nil {
+			return err
+		}
+		in.Judgments = js
+		if err := input.Validate(in); err != nil {
+			return err
+		}
+	}
+	return writeJSON(stdout, in)
+}
+
+func questions(ctx context.Context, args []string, dir string, stdout, stderr io.Writer) error {
+	flags, cfgPath := newFlagSet("questions", stderr)
+	if err := parse(flags, args); err != nil {
+		return err
+	}
+	root, cfg, in, err := load(dir, *cfgPath)
+	if err != nil {
+		return err
+	}
+	set, err := policy.Load(root, cfg.Policy, cfg.Entrypoint)
+	if err != nil {
+		return err
+	}
+	qs, err := set.Questions(ctx, in)
+	if err != nil {
+		return err
+	}
+	out, err := judge.Export(qs, in.Sources)
+	if err != nil {
+		return err
+	}
+	return writeJSON(stdout, out)
+}
+
+func writeJSON(w io.Writer, v any) error {
+	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	enc.SetEscapeHTML(false)
-	if err := enc.Encode(in); err != nil {
+	if err := enc.Encode(v); err != nil {
 		return fmt.Errorf("output: %w", err)
 	}
 	return nil

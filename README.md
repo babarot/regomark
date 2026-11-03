@@ -9,14 +9,16 @@ It is under development.
 ## Usage
 
 ```
-regomark check [--config .regomark.yaml] [--format text|github|json] [--judge | --no-judge]
-regomark dump [--config .regomark.yaml]
+regomark check [--config .regomark.yaml] [--format text|github|json] [--judge | --no-judge | --judgments FILE]
+regomark dump [--config .regomark.yaml] [--judge | --judgments FILE]
+regomark questions [--config .regomark.yaml]
 regomark version   # or --version
 ```
 
 - `check` evaluates the policies against the documents and prints the violations. It exits 0 when there is no deny, 1 when there is one, and 2 when the check cannot be done: an invalid configuration, no documents, no policy, a policy that breaks the rules below, a violation or a question that is not shaped as one, or a `deny` that reads the judgments.
-- `dump` prints the input the policies receive, as JSON, for writing policy tests.
-- `--judge` asks the policies' questions (see Questions below) with `judge.command`; `--no-judge` does not, even with `REGOMARK_JUDGE=on`.
+- `dump` prints the input the policies receive, as JSON, for writing policy tests. With `--judge` or `--judgments`, the judgments are in it; `REGOMARK_JUDGE` does not change what it prints.
+- `questions` prints the policies' questions with the prompts `judge.command` would get, as JSON, for a judge that answers them all at once (see below).
+- `--judge` asks the policies' questions (see Questions below) with `judge.command`; `--no-judge` does not, even with `REGOMARK_JUDGE=on`; `--judgments FILE` takes the answers from a file instead.
 - `--format`: `text` prints `path:line: [rule] message` (a warn as `path:line: warning: [rule] message`), `github` prints workflow commands that GitHub Actions shows as annotations (`::error` for a deny, `::warning` for a warn), and `json` prints an array of violations.
 
 regomark runs in a git repository. Every path, `--config` included, is relative to the repository root (`git rev-parse --show-toplevel`), so it gives the same result from any directory in the repository.
@@ -106,6 +108,30 @@ When asked, each question goes to `judge.command`, run in the repository root wi
 A `yes` must rest on a line that was sent. A command that fails or times out makes the judgment `provider_failed`, and an answer not shaped as one `invalid_answer`; neither changes the exit code. Answers are cached by the prompt and the command, so a question is asked again only when what it sends changes.
 
 The judge reads the documents, which may carry instructions of their own; give it no way to change the repository it judges, as `--tools ""` does for claude above.
+
+#### Answers from a file
+
+A judge that is not a command run per question, such as an agent in a CI job, can answer them all at once. `regomark questions` prints every question with its `key` and its `prompt`, and the `answer_schema`:
+
+```json
+{
+  "prompt_version": 1,
+  "answer_schema": {"type": "object", "...": "..."},
+  "questions": [
+    {"key": "sha256:9ac1...", "id": "spec-detail", "path": "docs/adr/007-a.md", "line": 12, "prompt": "Answer a question about part of a Markdown document. ..."}
+  ]
+}
+```
+
+The judge writes an answer per prompt, with its key, and `regomark check --judgments answers.json` reads them:
+
+```json
+{"answers": [{"key": "sha256:9ac1...", "verdict": "yes", "reason": "It names cache.Store.", "evidence_line": 16}]}
+```
+
+A key comes from what its question sends, so an answer to a document or a policy that has changed since matches no question. A question with no answer is `provider_failed`; an answer that matches nothing is reported on standard error and dropped. Answers from a file are not cached.
+
+Run such a judge apart from the check: in CI, one job runs `regomark questions`, another gives the questions to the judge and keeps only `answers.json`, and a third checks out the same commit afresh and runs `regomark check --judgments answers.json`. A judge that can change the checkout the check runs in could drop a `deny`, for instance by adding its rule to `skip_rules`.
 
 ### Input
 
