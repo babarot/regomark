@@ -12,7 +12,7 @@ It is under development.
 regomark check [--config .regomark.yaml] [--format text|pretty|github|json] [--judge | --no-judge | --judgments FILE]
 regomark dump [--config .regomark.yaml] [--judge | --judgments FILE]
 regomark questions [--config .regomark.yaml]
-regomark version   # or --version
+regomark --version
 ```
 
 - `check` evaluates the policies against the documents and prints the violations. It exits 0 when there is no deny, 1 when there is one, and 2 when the check cannot be done: an invalid configuration, no documents, no policy, a policy that breaks the rules below, a violation or a question that is not shaped as one, or a `deny` that reads the judgments.
