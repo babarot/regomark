@@ -1,0 +1,6 @@
+docs/a.md:6: warning: [HEADING] h1 Monitoring
+docs/a.md:8: warning: [LINK] file b.md -> docs/b.md
+docs/b.md:1: [TITLE] front matter has no title
+docs/b.md:4: warning: [HEADING] h1 B
+docs/c.md:1: [TITLE] front matter has no title
+docs/c.md:1: warning: [HEADING] h1 No front matter

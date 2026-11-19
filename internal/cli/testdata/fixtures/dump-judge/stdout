@@ -1,10 +1,11 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "root": ".",
   "documents": [
     {
       "path": "docs/adr.md",
       "name": "adr.md",
+      "meta": {},
       "blocks": [
         {
           "kind": "heading",

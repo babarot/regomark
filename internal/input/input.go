@@ -6,12 +6,12 @@ package input
 // SchemaVersion is the version of the input this regomark produces. A policy
 // set declares the version it was written for, and regomark refuses to
 // evaluate it against any other.
-const SchemaVersion = 2
+const SchemaVersion = 3
 
 // Input is the whole input of the policies.
 type Input struct {
 	// SchemaVersion is the version of this structure.
-	SchemaVersion int `json:"schema_version" jsonschema:"enum=2"`
+	SchemaVersion int `json:"schema_version" jsonschema:"enum=3"`
 	// Root is the repository root that every path is relative to. It is
 	// always ".", so the input does not depend on where the repository is.
 	Root string `json:"root" jsonschema:"enum=."`
@@ -33,6 +33,9 @@ type Document struct {
 	Path string `json:"path" jsonschema:"minLength=1"`
 	// Name is the file name of the document.
 	Name string `json:"name" jsonschema:"minLength=1"`
+	// Meta is the YAML front matter of the document, an empty object when it
+	// has none. A rule about it points at line 1.
+	Meta map[string]any `json:"meta"`
 	// Blocks are the top-level blocks in document order.
 	Blocks []Block `json:"blocks"`
 	// Links are all the links in the document, reference-style ones

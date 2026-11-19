@@ -27,11 +27,11 @@ func Build(root string, cfg *config.Config) (*Input, error) {
 		if err != nil {
 			return nil, err
 		}
-		blocks, links, err := Parse(src)
+		blocks, links, meta, err := Parse(src)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", p, err)
 		}
-		in.Documents = append(in.Documents, Document{Path: p, Name: path.Base(p), Blocks: blocks, Links: links})
+		in.Documents = append(in.Documents, Document{Path: p, Name: path.Base(p), Meta: meta, Blocks: blocks, Links: links})
 		in.Sources[p] = src
 	}
 	if err := resolveLinks(root, in.Documents); err != nil {

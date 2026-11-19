@@ -8,7 +8,7 @@ import (
 
 func valid() *Input {
 	return &Input{SchemaVersion: SchemaVersion, Root: ".", Documents: []Document{{
-		Path: "a.md", Name: "a.md",
+		Path: "a.md", Name: "a.md", Meta: map[string]any{"title": "A"},
 		Blocks: []Block{{Kind: "heading", Level: 1, Line: 1, EndLine: 1, Text: "A"}},
 		Links:  []Link{{Dest: "b.md", Text: "b", Line: 1, Target: "b.md", Kind: KindMissing}},
 	}}, Judgments: []Judgment{{ID: "q", Path: "a.md", Line: 1, Status: StatusNotRun}}}
@@ -31,6 +31,7 @@ func TestValidate(t *testing.T) {
 		want   string
 	}{
 		{"nil documents", func(in *Input) { in.Documents = nil }, "/documents"},
+		{"nil meta", func(in *Input) { in.Documents[0].Meta = nil }, "/documents/0/meta"},
 		{"nil blocks", func(in *Input) { in.Documents[0].Blocks = nil }, "/documents/0/blocks"},
 		{"unknown kind", func(in *Input) { in.Documents[0].Blocks[0].Kind = "headline" }, "/documents/0/blocks/0/kind"},
 		{"line 0", func(in *Input) { in.Documents[0].Links[0].Line = 0 }, "/documents/0/links/0/line"},

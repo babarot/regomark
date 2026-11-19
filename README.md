@@ -58,7 +58,7 @@ regomark loads every `.rego` file under the policy directory except `*_test.rego
 ```rego
 package adr
 
-schema_version := 2
+schema_version := 3
 
 rule_ids := {"ADR001"}
 
@@ -74,14 +74,15 @@ The input is validated against a JSON Schema generated from regomark's types bef
 
 ```json
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "root": ".",
   "documents": [
     {
       "path": "docs/adr/001-a.md",
       "name": "001-a.md",
+      "meta": {"status": "accepted", "date": "2026-11-19"},
       "blocks": [
-        {"kind": "heading", "level": 1, "line": 1, "end_line": 1, "text": "ADR-001: A", "lang": ""}
+        {"kind": "heading", "level": 1, "line": 6, "end_line": 6, "text": "ADR-001: A", "lang": ""}
       ],
       "links": [
         {"dest": "../../internal/a_test.go#L3", "text": "TestA", "line": 17,
@@ -96,6 +97,7 @@ The input is validated against a JSON Schema generated from regomark's types bef
 }
 ```
 
+- `meta` is the YAML front matter of the document, and `{}` when it has none, so a policy can test `doc.meta.title` without guarding against it being undefined. Front matter is the lines from a first line that is exactly `---` (after a UTF-8 BOM, if any) to the next line that is exactly `---` or `...`; without that closing line, the document has none. It must be a mapping, and is read as JSON: a timestamp becomes a string, a date as written and a date with a time in RFC 3339. Front matter that is not valid YAML or not a mapping exits 2. It is not Markdown, so no block or link comes from it, and the lines after it keep their numbers; a rule about the front matter reports line 1.
 - `blocks` are the top-level blocks in document order. `kind` is one of `heading`, `paragraph`, `code`, `list`, `quote`, `html`, `rule` and `table`; `line` is where the block starts (the opening fence for fenced code) and `end_line` where it ends (its last child and a closing fence included, blank lines after it not); `text` is plain text with code spans in backquotes and a line break where a source line or a block ends, so its lines do not always match the source's (code and HTML blocks are as they are); `level` is set for headings and `lang` for fenced code.
 - `judgments` are the answers to the questions, sorted by path, id and line, with the question's `id`, `path` and `line`. `status` is `ok` for an answer, `not_run` when the question was not asked, `provider_failed` when asking failed and `invalid_answer` for an answer not shaped as one. With `ok`, `verdict` is `yes` or `no`, `reason` says why, and `evidence_line` is the line a `yes` rests on; `error` says what went wrong otherwise. Unused fields are empty or 0.
 - `links` are every link in the document, reference-style links and autolinks included. `target` is the root-relative path the link points to: the destination without its fragment and query, percent-decoded, relative to the document (or to the repository root when it starts with `/`), and cleaned. `kind` is `file` or `dir` for what exists in the worktree, `missing` for what does not or what git ignores (it would not exist in a fresh clone), `outside` for a target out of the repository, and `external` for a destination with a scheme or only a fragment (`target` is then empty). A path is matched with its case as written, so a case-insensitive file system does not hide a broken link.
