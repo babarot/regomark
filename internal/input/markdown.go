@@ -61,8 +61,8 @@ func (p *parser) endLine(start int, next gast.Node) int {
 
 // startLine returns the line a node starts at, if it has a position.
 func (p *parser) startLine(n gast.Node) (int, bool) {
-	if n.Pos() >= 0 {
-		return p.line(n.Pos()), true
+	if pos := blockPos(n); pos >= 0 {
+		return p.line(pos), true
 	}
 	if n.Type() == gast.TypeBlock && n.Lines().Len() > 0 {
 		return p.line(n.Lines().At(0).Start), true
@@ -101,11 +101,22 @@ func (p *parser) line(offset int) int {
 	return sort.Search(len(p.lineStarts), func(i int) bool { return p.lineStarts[i] > offset })
 }
 
+// blockPos returns the offset a block starts at, or -1 if it has none. When
+// a table interrupts a paragraph, goldmark gives the table the paragraph's
+// position, so a table starts where its header row does.
+func blockPos(n gast.Node) int {
+	if t, ok := n.(*east.Table); ok && t.FirstChild() != nil {
+		return t.FirstChild().Pos()
+	}
+	return n.Pos()
+}
+
 func (p *parser) block(n gast.Node) (Block, error) {
-	if n.Pos() < 0 {
+	pos := blockPos(n)
+	if pos < 0 {
 		return Block{}, fmt.Errorf("a %s block has no position", n.Kind())
 	}
-	b := Block{Line: p.line(n.Pos())}
+	b := Block{Line: p.line(pos)}
 	switch v := n.(type) {
 	case *gast.Heading:
 		b.Kind, b.Level, b.Text = "heading", v.Level, p.plain(v)
