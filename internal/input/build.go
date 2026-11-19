@@ -104,47 +104,29 @@ func dirPaths(root, dir string) ([]string, error) {
 }
 
 // matchingPaths returns the root-relative paths of the Markdown files in the
-// worktree that match one of the patterns. It does not descend into .git, nor
-// into a nested repository such as a submodule, whose files git would not
-// answer for.
+// worktree that match one of the patterns. It lists what git lists, so it
+// does not go into what git ignores, .git or a nested repository such as a
+// submodule.
 func matchingPaths(root string, patterns []string) ([]string, error) {
-	var paths []string
-	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
-		rel, relErr := filepath.Rel(root, p)
-		if relErr != nil {
-			return relErr
-		}
-		rel = filepath.ToSlash(rel)
-		if err != nil {
-			return fmt.Errorf("documents: cannot read %s: %w", rel, unwrapPath(err))
-		}
-		if d.IsDir() {
-			if rel == "." {
-				return nil
-			}
-			if d.Name() == ".git" {
-				return fs.SkipDir
-			}
-			if _, err := os.Lstat(filepath.Join(p, ".git")); err == nil {
-				return fs.SkipDir
-			}
-			return nil
-		}
-		if !isMarkdown(d.Name()) {
-			return nil
-		}
-		for _, pat := range patterns {
-			if glob.Match(pat, rel) {
-				paths = append(paths, rel)
-				break
-			}
-		}
-		return nil
-	})
+	files, err := gitrepo.Files(root)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("documents: %w", err)
 	}
-	return paths, nil
+	var paths []string
+	for _, f := range files {
+		if !isMarkdown(path.Base(f)) || !slices.ContainsFunc(patterns, func(pat string) bool { return glob.Match(pat, f) }) {
+			continue
+		}
+		// Tracked but deleted, or outside a sparse checkout: not in the
+		// worktree, so not a document
+		if _, err := os.Lstat(filepath.Join(root, filepath.FromSlash(f))); errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		paths = append(paths, f)
+	}
+	// An unmerged file is listed once per stage
+	slices.Sort(paths)
+	return slices.Compact(paths), nil
 }
 
 func isMarkdown(name string) bool {

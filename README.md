@@ -50,7 +50,7 @@ documents:
   - "docs/**/*.md"   # docs/a.md, docs/x/y/b.md
 ```
 
-Only `.md` files are documents, so a pattern that names anything else matches nothing. A single string with `*`, `?` or `[` in it is one pattern. The patterns do not look inside `.git` or a nested repository such as a submodule. `exclude` takes the same patterns.
+Only `.md` files are documents, so a pattern that names anything else matches nothing. A single string with `*`, `?` or `[` in it is one pattern. Patterns look only at the files git lists (`git ls-files --cached --others --exclude-standard`), so not inside what git ignores, `.git`, or a nested repository such as a submodule. `exclude` takes the same patterns.
 
 An unknown key, or a rule ID in `skip_rules` that the policy set does not declare, exits 2, as does `documents` that names no documents. Documents that git ignores are not checked, and one that cannot be read, such as a broken symbolic link, exits 2.
 

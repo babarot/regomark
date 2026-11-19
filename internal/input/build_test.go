@@ -144,7 +144,6 @@ func TestBuildPatterns(t *testing.T) {
 		"docs/drafts/z.md":         "# excluded\n",
 		"docs/AGENTS.md":           "# matched twice\n",
 		"local/AGENTS.md":          "# ignored\n",
-		"nested/.git/HEAD":         "a nested repository\n",
 		"nested/AGENTS.md":         "# in a nested repository\n",
 		".git-not/AGENTS.md":       "# not .git\n",
 		"docs.md/not-a-doc.txt":    "x\n",
@@ -164,7 +163,28 @@ func TestBuildPatterns(t *testing.T) {
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git init: %v\n%s", err, out)
 	}
-	// A document in .git is not one
+	// One in a nested repository is not one of this repository's
+	if err := os.MkdirAll(filepath.Join(root, "nested"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	cmd = exec.Command("git", "init", "-q", "nested")
+	cmd.Dir = root
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git init nested: %v\n%s", err, out)
+	}
+	// One tracked but deleted from the worktree is not one either
+	cmd = exec.Command("git", "add", "a/AGENTS.md", "docs/gone.md")
+	if err := os.WriteFile(filepath.Join(root, "docs", "gone.md"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cmd.Dir = root
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git add: %v\n%s", err, out)
+	}
+	if err := os.Remove(filepath.Join(root, "docs", "gone.md")); err != nil {
+		t.Fatal(err)
+	}
+	// Nor is one in .git
 	if err := os.WriteFile(filepath.Join(root, ".git", "AGENTS.md"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -218,6 +238,18 @@ func TestBuildPatterns(t *testing.T) {
 	_, err = paths(&config.Config{Documents: config.Documents{Patterns: []string{"local/*.md", "docs/drafts/*"}}, Exclude: []string{"docs/**"}})
 	if err == nil || !strings.Contains(err.Error(), "no Markdown documents match") {
 		t.Errorf("all left out: error = %v", err)
+	}
+
+	// An ignored directory that cannot be read is not looked into
+	if err := os.MkdirAll(filepath.Join(root, "local", "locked"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(filepath.Join(root, "local", "locked"), 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(filepath.Join(root, "local", "locked"), 0o755) })
+	if _, err := paths(&config.Config{Documents: config.Documents{Patterns: []string{"**/AGENTS.md"}}}); err != nil {
+		t.Errorf("with an unreadable ignored directory: %v", err)
 	}
 
 	// A broken symbolic link that matches cannot be read
