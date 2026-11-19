@@ -35,7 +35,7 @@ func TestParseBlocks(t *testing.T) {
 		"| c1 | c2 |\n" +
 		"\n" +
 		"[ref]: x.md\n"
-	blocks, links, err := Parse([]byte(src))
+	blocks, links, _, err := Parse([]byte(src))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +80,7 @@ func TestParseEndLine(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			blocks, _, err := Parse([]byte(tt.src))
+			blocks, _, _, err := Parse([]byte(tt.src))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -107,7 +107,7 @@ func TestParseLinks(t *testing.T) {
 		"[r]: r.md\n" +
 		"[collapsed]: <c d.md>\n" +
 		"[shortcut]: s.md#frag\n"
-	_, links, err := Parse([]byte(src))
+	_, links, _, err := Parse([]byte(src))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +126,7 @@ func TestParseLinks(t *testing.T) {
 }
 
 func TestParseEmpty(t *testing.T) {
-	blocks, links, err := Parse(nil)
+	blocks, links, _, err := Parse(nil)
 	if err != nil {
 		t.Fatal(err)
 	}

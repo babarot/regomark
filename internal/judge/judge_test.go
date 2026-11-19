@@ -79,7 +79,7 @@ const src = "# ADR\n\n## Decision\n\nUse `Store.Get`.\nKeep it.\n\n- a\n\n- b\n"
 
 func blocks(t *testing.T) []input.Block {
 	t.Helper()
-	bs, _, err := input.Parse([]byte(src))
+	bs, _, _, err := input.Parse([]byte(src))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -14,7 +14,7 @@ import (
 
 const schemaRego = `package docs
 
-schema_version := 2
+schema_version := 3
 
 rule_ids := {"A", "B"}
 `
@@ -37,7 +37,7 @@ func write(t *testing.T, files map[string]string) string {
 
 func testInput() *input.Input {
 	return &input.Input{SchemaVersion: input.SchemaVersion, Root: ".", Documents: []input.Document{{
-		Path: "docs/a.md", Name: "a.md",
+		Path: "docs/a.md", Name: "a.md", Meta: map[string]any{},
 		Blocks: []input.Block{{Kind: "heading", Level: 1, Line: 1, EndLine: 1, Text: "A"}, {Kind: "paragraph", Line: 3, EndLine: 3, Text: "x"}},
 		Links:  []input.Link{},
 	}}, Judgments: []input.Judgment{}}
@@ -62,7 +62,7 @@ func TestLoadPackageRules(t *testing.T) {
 		}, nil},
 		{"child package", map[string]string{"schema.rego": schemaRego, "x.rego": "package docs.x\ndeny contains 1 if true\n"},
 			[]string{"policy/x.rego: package docs.x must be docs"}},
-		{"other package", map[string]string{"schema.rego": "package adr\nschema_version := 2\n"},
+		{"other package", map[string]string{"schema.rego": "package adr\nschema_version := 3\n"},
 			[]string{"policy/schema.rego: package adr must be docs"}},
 		{"neither deny nor warn", map[string]string{"schema.rego": schemaRego, "x.rego": "package docs\ndenies contains 1 if true\n"},
 			[]string{"policy/x.rego: defines none of deny, warn and questions"}},
@@ -226,8 +226,8 @@ func TestEvalErrors(t *testing.T) {
 		{"schema version mismatch", "package docs\nschema_version := 1\nrule_ids := {\"A\"}\n", "", "written for input schema version 1"},
 		{"schema version not a number", "package docs\nschema_version := \"1\"\nrule_ids := {\"A\"}\n", "", "not an integer"},
 		{"no schema version", "package docs\nrule_ids := {\"A\"}\n", "", "does not define schema_version"},
-		{"no rule IDs", "package docs\nschema_version := 2\n", "", "rule_ids: not defined"},
-		{"rule IDs not strings", "package docs\nschema_version := 2\nrule_ids := {1}\n", "", "must be a set of non-empty strings"},
+		{"no rule IDs", "package docs\nschema_version := 3\n", "", "rule_ids: not defined"},
+		{"rule IDs not strings", "package docs\nschema_version := 3\nrule_ids := {1}\n", "", "must be a set of non-empty strings"},
 		{"not an object", schemaRego, `deny contains "x" if true`, "must be an object"},
 		{"missing message", schemaRego, `deny contains {"rule": "A", "path": "a", "line": 1} if true`, "message is missing"},
 		{"empty path", schemaRego, `deny contains {"rule": "A", "path": "", "line": 1, "message": "m"} if true`, "path must be a non-empty string"},

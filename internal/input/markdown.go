@@ -17,9 +17,15 @@ import (
 // markdown is CommonMark with GitHub's tables, which are a block of their own.
 var markdown = goldmark.New(goldmark.WithExtensions(extension.Table))
 
-// Parse reads a Markdown document into its top-level blocks and its links.
-// The links are not resolved: Target and Kind are left empty.
-func Parse(src []byte) ([]Block, []Link, error) {
+// Parse reads a Markdown document into its top-level blocks, its links and its
+// YAML front matter, an empty object when it has none. The front matter is
+// not Markdown, and the lines after it keep their numbers. The links are not
+// resolved: Target and Kind are left empty.
+func Parse(src []byte) ([]Block, []Link, map[string]any, error) {
+	src, meta, err := splitFrontMatter(src)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 	p := parser{src: src, lineStarts: lineStarts(src)}
 	root := markdown.Parser().Parse(text.NewReader(src))
 	blocks := []Block{}
@@ -30,13 +36,13 @@ func Parse(src []byte) ([]Block, []Link, error) {
 		}
 		b, err := p.block(n)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		b.EndLine = p.endLine(b.Line, n.NextSibling())
 		blocks = append(blocks, b)
 		links = append(links, p.links(n, b.Line)...)
 	}
-	return blocks, links, nil
+	return blocks, links, meta, nil
 }
 
 // endLine returns the last line of the top-level block starting at start,
