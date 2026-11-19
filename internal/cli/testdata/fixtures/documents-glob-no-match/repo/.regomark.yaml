@@ -1,0 +1,5 @@
+documents:
+  - "**/AGENTS.md"
+  - "docs/**/*.md"
+policy: .regomark/policy
+entrypoint: docs

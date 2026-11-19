@@ -2,7 +2,7 @@
 
 Check Markdown documents with rego policies.
 
-regomark reads a directory of Markdown documents into JSON that keeps the line of every block and link, resolves each link against the repository, and evaluates rego policies against that JSON with the OPA engine built in. The rules (which sections a document must have, how documents refer to each other, which links must resolve) are written in rego and tested with `opa test`; regomark itself knows nothing about any document format.
+regomark reads Markdown documents into JSON that keeps the line of every block and link, resolves each link against the repository, and evaluates rego policies against that JSON with the OPA engine built in. The rules (which sections a document must have, how documents refer to each other, which links must resolve) are written in rego and tested with `opa test`; regomark itself knows nothing about any document format.
 
 It is under development.
 
@@ -28,11 +28,11 @@ regomark runs in a git repository. Every path, `--config` included, is relative 
 `.regomark.yaml` at the repository root:
 
 ```yaml
-documents: docs/adr          # the directory of the Markdown documents (*.md right in it)
+documents: docs/adr          # the directory of the Markdown documents (*.md right in it), or a list of patterns
 policy: .regomark/policy     # the directory of the rego policies
 entrypoint: adr              # the package of deny and warn (data.adr)
 skip_rules: []               # rule IDs whose violations are dropped
-exclude: []                  # documents not to check, as path.Match patterns (docs/adr/000-*.md)
+exclude: []                  # documents not to check, as patterns (docs/adr/000-*.md)
 judge:                       # how to ask the policies' questions; optional
   command: [sh, -c, 'claude -p --output-format json --model sonnet --tools "" --json-schema "$REGOMARK_ANSWER_SCHEMA"']
   parallel: 4                # commands at once
@@ -41,7 +41,18 @@ judge:                       # how to ask the policies' questions; optional
   max_questions: 200         # more questions than this exits 2, a limit on what a run costs
 ```
 
-An unknown key, or a rule ID in `skip_rules` that the policy set does not declare, exits 2. Documents that git ignores are not checked, and one that cannot be read, such as a broken symbolic link, exits 2.
+`documents` is either a directory, whose `*.md` files right in it are the documents, or a list of patterns, which a document's path matches. A pattern is [`path.Match`](https://pkg.go.dev/path#Match) syntax against the path relative to the repository root, where a segment that is exactly `**` matches any number of directories, none included. To check instruction files spread across the repository with one policy set, so that a policy can check things across them:
+
+```yaml
+documents:
+  - "**/AGENTS.md"   # AGENTS.md at the root, and in every directory under it
+  - "**/CLAUDE.md"
+  - "docs/**/*.md"   # docs/a.md, docs/x/y/b.md
+```
+
+Only `.md` files are documents, so a pattern that names anything else matches nothing. A single string with `*`, `?` or `[` in it is one pattern. The patterns do not look inside `.git` or a nested repository such as a submodule. `exclude` takes the same patterns.
+
+An unknown key, or a rule ID in `skip_rules` that the policy set does not declare, exits 2, as does `documents` that names no documents. Documents that git ignores are not checked, and one that cannot be read, such as a broken symbolic link, exits 2.
 
 ### Policies
 

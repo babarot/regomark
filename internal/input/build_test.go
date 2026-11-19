@@ -3,6 +3,7 @@ package input
 import (
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -84,7 +85,7 @@ func TestBuild(t *testing.T) {
 		t.Fatalf("git init: %v\n%s", err, out)
 	}
 
-	in, err := Build(root, &config.Config{Documents: "docs", Exclude: []string{"docs/000-*.md"}})
+	in, err := Build(root, &config.Config{Documents: config.Documents{Dir: "docs"}, Exclude: []string{"docs/000-*.md"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,13 +112,120 @@ func TestBuild(t *testing.T) {
 	if err := os.Symlink("nowhere.md", filepath.Join(root, "docs", "e.md")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := Build(root, &config.Config{Documents: "docs", Exclude: []string{"docs/000-*.md"}}); err == nil || !strings.Contains(err.Error(), "cannot read docs/e.md") {
+	if _, err := Build(root, &config.Config{Documents: config.Documents{Dir: "docs"}, Exclude: []string{"docs/000-*.md"}}); err == nil || !strings.Contains(err.Error(), "cannot read docs/e.md") {
 		t.Errorf("Build with a broken link as a document: error = %v", err)
 	}
-	if _, err := Build(root, &config.Config{Documents: "docs/sub/none"}); err == nil {
+	if _, err := Build(root, &config.Config{Documents: config.Documents{Dir: "docs/sub/none"}}); err == nil {
 		t.Error("Build succeeded on a missing directory")
 	}
-	if _, err := Build(root, &config.Config{Documents: "out"}); err == nil {
+	if _, err := Build(root, &config.Config{Documents: config.Documents{Dir: "out"}}); err == nil {
 		t.Error("Build succeeded without documents")
+	}
+}
+
+func TestBuildPatterns(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", home)
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+
+	root := t.TempDir()
+	for name, content := range map[string]string{
+		".gitignore":               "local/\n",
+		"AGENTS.md":                "# root\n",
+		"CLAUDE.md":                "# root\n",
+		"README.md":                "# not named\n",
+		"a/AGENTS.md":              "# a\n",
+		"a/b/c/AGENTS.md":          "# c\n",
+		"a/b/c/AGENTS.txt":         "not Markdown\n",
+		"docs/x.md":                "# x\n",
+		"docs/deep/er/y.md":        "# y\n",
+		"docs/drafts/z.md":         "# excluded\n",
+		"docs/AGENTS.md":           "# matched twice\n",
+		"local/AGENTS.md":          "# ignored\n",
+		"nested/.git/HEAD":         "a nested repository\n",
+		"nested/AGENTS.md":         "# in a nested repository\n",
+		".git-not/AGENTS.md":       "# not .git\n",
+		"docs.md/not-a-doc.txt":    "x\n",
+		"other/docs/x.md":          "# docs not at the root\n",
+		"other/AGENTS.md.d/x.conf": "x\n",
+	} {
+		p := filepath.Join(root, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cmd := exec.Command("git", "init", "-q")
+	cmd.Dir = root
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v\n%s", err, out)
+	}
+	// A document in .git is not one
+	if err := os.WriteFile(filepath.Join(root, ".git", "AGENTS.md"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	paths := func(cfg *config.Config) ([]string, error) {
+		t.Helper()
+		in, err := Build(root, cfg)
+		if err != nil {
+			return nil, err
+		}
+		if err := Validate(in); err != nil {
+			t.Fatal(err)
+		}
+		var ps []string
+		for _, d := range in.Documents {
+			if d.Name != path.Base(d.Path) {
+				t.Errorf("name %q of %q", d.Name, d.Path)
+			}
+			ps = append(ps, d.Path)
+		}
+		return ps, nil
+	}
+
+	got, err := paths(&config.Config{
+		Documents: config.Documents{Patterns: []string{"**/AGENTS.md", "**/CLAUDE.md", "docs/**/*.md"}},
+		Exclude:   []string{"**/drafts/**"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		".git-not/AGENTS.md",
+		"AGENTS.md",
+		"CLAUDE.md",
+		"a/AGENTS.md",
+		"a/b/c/AGENTS.md",
+		"docs/AGENTS.md",
+		"docs/deep/er/y.md",
+		"docs/x.md",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("documents = %v, want %v", got, want)
+	}
+
+	// A pattern that names something other than Markdown matches nothing
+	_, err = paths(&config.Config{Documents: config.Documents{Patterns: []string{"**/*.txt", "**/AGENTS.md.d"}}})
+	if err == nil || !strings.Contains(err.Error(), "documents: no Markdown documents match **/*.txt, **/AGENTS.md.d") {
+		t.Errorf("no match: error = %v", err)
+	}
+	// Ignored and excluded documents leave nothing
+	_, err = paths(&config.Config{Documents: config.Documents{Patterns: []string{"local/*.md", "docs/drafts/*"}}, Exclude: []string{"docs/**"}})
+	if err == nil || !strings.Contains(err.Error(), "no Markdown documents match") {
+		t.Errorf("all left out: error = %v", err)
+	}
+
+	// A broken symbolic link that matches cannot be read
+	if err := os.Symlink("nowhere.md", filepath.Join(root, "a", "b", "CLAUDE.md")); err != nil {
+		t.Fatal(err)
+	}
+	_, err = paths(&config.Config{Documents: config.Documents{Patterns: []string{"**/CLAUDE.md"}}})
+	if err == nil || !strings.Contains(err.Error(), "cannot read a/b/CLAUDE.md") {
+		t.Errorf("broken link: error = %v", err)
 	}
 }

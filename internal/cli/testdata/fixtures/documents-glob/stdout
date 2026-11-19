@@ -1,0 +1,9 @@
+AGENTS.md:1: warning: [HEADING] h1 Root agents
+AGENTS.md:3: warning: [LINK] file CLAUDE.md -> CLAUDE.md
+CLAUDE.md:1: warning: [HEADING] h1 Root claude
+docs/adr/001-a.md:1: warning: [HEADING] h1 ADR 1
+docs/index.md:1: warning: [HEADING] h1 Index
+docs/index.md:3: [BROKEN] missing gone.md -> docs/gone.md
+docs/index.md:3: warning: [LINK] file adr/001-a.md -> docs/adr/001-a.md
+sub/deep/AGENTS.md:1: warning: [HEADING] h1 Sub agents
+sub/deep/AGENTS.md:3: warning: [LINK] file ../../docs/index.md -> docs/index.md
