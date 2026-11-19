@@ -74,6 +74,9 @@ func TestParseEndLine(t *testing.T) {
 		{"nested", "> - a\n>\n>   ```\n>   x\n>   ```\n", [][2]int{{1, 5}}},
 		{"definition between", "para\n\n[r]: x.md\n\n# h\n", [][2]int{{1, 1}, {5, 5}}},
 		{"crlf", "a\r\nb\r\n\r\nc\r\n", [][2]int{{1, 2}, {4, 4}}},
+		{"table after a paragraph", "para\n| a | b |\n| - | - |\n| 1 | 2 |\n", [][2]int{{1, 1}, {2, 4}}},
+		{"table after two lines", "p1\np2\n| a | b |\n| - | - |\n\nnext\n", [][2]int{{1, 2}, {3, 4}, {6, 6}}},
+		{"table with an empty first header cell", "para\n|  | b |\n| - | - |\n", [][2]int{{1, 1}, {2, 3}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
