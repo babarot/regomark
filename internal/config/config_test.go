@@ -1,6 +1,7 @@
 package config
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -16,7 +17,7 @@ exclude: [docs/adr/000-*.md]
 	if err != nil {
 		t.Fatal(err)
 	}
-	if c.Documents != "docs/adr" || c.Policy != ".regomark/policy" || c.Entrypoint != "adr" {
+	if c.Documents.Dir != "docs/adr" || c.Documents.Patterns != nil || c.Policy != ".regomark/policy" || c.Entrypoint != "adr" {
 		t.Errorf("got %+v", c)
 	}
 	if len(c.SkipRules) != 1 || c.SkipRules[0] != "ADR001" {
@@ -41,6 +42,14 @@ func TestParseErrors(t *testing.T) {
 		{"outside", "documents: docs/../..\npolicy: policy\nentrypoint: adr\n", "must be inside the repository"},
 		{"backslash", "documents: docs\\adr\npolicy: policy\nentrypoint: adr\n", "use forward slashes"},
 		{"bad pattern", base + "exclude: ['[']\n", "is not a valid pattern"},
+		{"bad recursive pattern", base + "exclude: ['**/[']\n", "is not a valid pattern"},
+		{"documents not a string or list", "documents: {a: b}\npolicy: policy\nentrypoint: adr\n", "documents: must be a directory or a list of patterns"},
+		{"documents empty list", "documents: []\npolicy: policy\nentrypoint: adr\n", "documents: must be set"},
+		{"documents empty pattern", "documents: ['**/*.md', '']\npolicy: policy\nentrypoint: adr\n", "documents: an entry is empty"},
+		{"documents bad pattern", "documents: ['docs/**/[']\npolicy: policy\nentrypoint: adr\n", `documents: "docs/**/[" is not a valid pattern`},
+		{"documents absolute pattern", "documents: ['/**/*.md']\npolicy: policy\nentrypoint: adr\n", "must be relative to the repository root"},
+		{"documents pattern outside", "documents: ['../**/*.md']\npolicy: policy\nentrypoint: adr\n", "must be inside the repository"},
+		{"documents pattern not strings", "documents: [[a]]\npolicy: policy\nentrypoint: adr\n", "cannot unmarshal"},
 		{"empty skip rule", base + "skip_rules: ['']\n", "skip_rules: an entry is empty"},
 		{"unknown judge key", base + "judge:\n  enabled: true\n", "field enabled is not a known key"},
 		{"empty command", base + "judge:\n  command: []\n", "judge.command: must name a command"},
@@ -57,6 +66,47 @@ func TestParseErrors(t *testing.T) {
 				t.Errorf("error = %v, want one containing %q", err, tt.want)
 			}
 		})
+	}
+}
+
+func TestParseDocuments(t *testing.T) {
+	tests := []struct {
+		name, documents string
+		want            Documents
+	}{
+		{"directory", "./docs/adr/", Documents{Dir: "docs/adr"}},
+		{"root", ".", Documents{Dir: "."}},
+		{"pattern string", "'docs/**/*.md'", Documents{Patterns: []string{"docs/**/*.md"}}},
+		{"list", "['**/AGENTS.md', ./docs/**/*.md]", Documents{Patterns: []string{"**/AGENTS.md", "docs/**/*.md"}}},
+		{"list of one directory", "[docs]", Documents{Patterns: []string{"docs"}}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := Parse([]byte("documents: " + tt.documents + "\npolicy: p\nentrypoint: adr\n"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(c.Documents, tt.want) {
+				t.Errorf("documents = %#v, want %#v", c.Documents, tt.want)
+			}
+		})
+	}
+}
+
+func TestExcluded(t *testing.T) {
+	c := &Config{Exclude: []string{"docs/000-*.md", "**/drafts/**", "**/README.md"}}
+	for p, want := range map[string]bool{
+		"docs/000-template.md":     true,
+		"docs/sub/000-template.md": false,
+		"docs/001-a.md":            false,
+		"drafts/a.md":              true,
+		"docs/drafts/x/a.md":       true,
+		"README.md":                true,
+		"docs/README.md":           true,
+	} {
+		if got := c.Excluded(p); got != want {
+			t.Errorf("Excluded(%q) = %v, want %v", p, got, want)
+		}
 	}
 }
 

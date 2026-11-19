@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"testing"
 )
 
@@ -87,5 +88,37 @@ func TestIgnored(t *testing.T) {
 	none, err := Ignored(root, []string{"a b.md"})
 	if err != nil || len(none) != 0 {
 		t.Errorf("Ignored = %v, %v; want none", none, err)
+	}
+}
+
+func TestFiles(t *testing.T) {
+	isolateGit(t)
+	root := t.TempDir()
+	run(t, root, "init", "-q")
+	for name, content := range map[string]string{
+		".gitignore":          "out/\n*.log\n",
+		"tracked.md":          "",
+		"tracked.log":         "",
+		"untracked.md":        "",
+		"a b/c.md":            "",
+		"out/x.md":            "",
+		"debug.log":           "",
+		"nested/inner.md":     "",
+		"sub/dir/deeper.md":   "",
+		"ignored-dir/file.md": "",
+	} {
+		writeFile(t, filepath.Join(root, filepath.FromSlash(name)), content)
+	}
+	run(t, root, "add", "-f", "tracked.md", "tracked.log")
+	run(t, filepath.Join(root, "nested"), "init", "-q")
+	got, err := Files(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	slices.Sort(got)
+	// A tracked file is listed even if ignored; a nested repository is one entry
+	want := []string{".gitignore", "a b/c.md", "ignored-dir/file.md", "nested/", "sub/dir/deeper.md", "tracked.log", "tracked.md", "untracked.md"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("Files = %q, want %q", got, want)
 	}
 }

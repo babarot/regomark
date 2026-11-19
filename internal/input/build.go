@@ -12,6 +12,7 @@ import (
 
 	"github.com/babarot/regomark/internal/config"
 	"github.com/babarot/regomark/internal/gitrepo"
+	"github.com/babarot/regomark/internal/glob"
 )
 
 // Build reads the documents the configuration names from the repository at
@@ -40,26 +41,23 @@ func Build(root string, cfg *config.Config) (*Input, error) {
 	return in, nil
 }
 
-// documentPaths returns the root-relative paths of the Markdown files right
-// in the documents directory, sorted, leaving out the excluded ones and the
-// ones git ignores.
+// documentPaths returns the root-relative paths of the documents the
+// configuration names, sorted, leaving out the excluded ones and the ones git
+// ignores.
 func documentPaths(root string, cfg *config.Config) ([]string, error) {
-	entries, err := os.ReadDir(filepath.Join(root, filepath.FromSlash(cfg.Documents)))
+	var (
+		paths []string
+		err   error
+	)
+	if cfg.Documents.Patterns == nil {
+		paths, err = dirPaths(root, cfg.Documents.Dir)
+	} else {
+		paths, err = matchingPaths(root, cfg.Documents.Patterns)
+	}
 	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return nil, fmt.Errorf("documents: %s does not exist", cfg.Documents)
-		}
-		return nil, fmt.Errorf("documents: %w", err)
+		return nil, err
 	}
-	var paths []string
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".md") {
-			continue
-		}
-		if p := path.Join(cfg.Documents, e.Name()); !cfg.Excluded(p) {
-			paths = append(paths, p)
-		}
-	}
+	paths = slices.DeleteFunc(paths, cfg.Excluded)
 	ignored, err := gitrepo.Ignored(root, paths)
 	if err != nil {
 		return nil, err
@@ -77,10 +75,62 @@ func documentPaths(root string, cfg *config.Config) ([]string, error) {
 		}
 	}
 	if len(paths) == 0 {
-		return nil, fmt.Errorf("documents: no Markdown documents to check in %s", cfg.Documents)
+		if cfg.Documents.Patterns == nil {
+			return nil, fmt.Errorf("documents: no Markdown documents to check in %s", cfg.Documents)
+		}
+		return nil, fmt.Errorf("documents: no Markdown documents match %s", cfg.Documents)
 	}
 	slices.Sort(paths)
 	return paths, nil
+}
+
+// dirPaths returns the root-relative paths of the Markdown files right in
+// the directory dir.
+func dirPaths(root, dir string) ([]string, error) {
+	entries, err := os.ReadDir(filepath.Join(root, filepath.FromSlash(dir)))
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, fmt.Errorf("documents: %s does not exist", dir)
+		}
+		return nil, fmt.Errorf("documents: %w", err)
+	}
+	var paths []string
+	for _, e := range entries {
+		if !e.IsDir() && isMarkdown(e.Name()) {
+			paths = append(paths, path.Join(dir, e.Name()))
+		}
+	}
+	return paths, nil
+}
+
+// matchingPaths returns the root-relative paths of the Markdown files in the
+// worktree that match one of the patterns. It lists what git lists, so it
+// does not go into what git ignores, .git or a nested repository such as a
+// submodule.
+func matchingPaths(root string, patterns []string) ([]string, error) {
+	files, err := gitrepo.Files(root)
+	if err != nil {
+		return nil, fmt.Errorf("documents: %w", err)
+	}
+	var paths []string
+	for _, f := range files {
+		if !isMarkdown(path.Base(f)) || !slices.ContainsFunc(patterns, func(pat string) bool { return glob.Match(pat, f) }) {
+			continue
+		}
+		// Tracked but deleted, or outside a sparse checkout: not in the
+		// worktree, so not a document
+		if _, err := os.Lstat(filepath.Join(root, filepath.FromSlash(f))); errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		paths = append(paths, f)
+	}
+	// An unmerged file is listed once per stage
+	slices.Sort(paths)
+	return slices.Compact(paths), nil
+}
+
+func isMarkdown(name string) bool {
+	return strings.HasSuffix(name, ".md")
 }
 
 // unwrapPath drops the absolute path from a file system error, which names

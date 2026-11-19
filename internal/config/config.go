@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"go.yaml.in/yaml/v3"
+
+	"github.com/babarot/regomark/internal/glob"
 )
 
 // DefaultPath is where regomark looks for the configuration, relative to the
@@ -21,20 +23,67 @@ const DefaultPath = ".regomark.yaml"
 // Config is the content of .regomark.yaml. Every path in it is relative to
 // the repository root and uses forward slashes.
 type Config struct {
-	// Documents is the directory of the Markdown documents to check.
-	Documents string `yaml:"documents"`
+	// Documents is which Markdown documents to check.
+	Documents Documents `yaml:"documents"`
 	// Policy is the directory of the rego policies.
 	Policy string `yaml:"policy"`
 	// Entrypoint is the package that defines deny and warn (data.<entrypoint>).
 	Entrypoint string `yaml:"entrypoint"`
 	// SkipRules are the IDs of the rules whose violations are dropped.
 	SkipRules []string `yaml:"skip_rules"`
-	// Exclude are the documents not to check, as path.Match patterns
-	// against their root-relative paths.
+	// Exclude are the documents not to check, as patterns (see package
+	// glob) against their root-relative paths.
 	Exclude []string `yaml:"exclude"`
 	// Judge is how to ask the policies' questions. It never turns judging
 	// on: only the user does, with a flag or REGOMARK_JUDGE.
 	Judge Judge `yaml:"judge"`
+}
+
+// Documents is the documents key: a directory, whose *.md files right in it
+// are the documents, or patterns, which the root-relative paths of the
+// documents match. Exactly one of Dir and Patterns is set in a valid
+// configuration.
+type Documents struct {
+	// Dir is the directory, when documents is a string without glob
+	// metacharacters.
+	Dir string
+	// Patterns are the patterns, when documents is a list or a string with
+	// glob metacharacters.
+	Patterns []string
+}
+
+// UnmarshalYAML takes either a string or a list of strings.
+func (d *Documents) UnmarshalYAML(n *yaml.Node) error {
+	switch n.Kind {
+	case yaml.ScalarNode:
+		var s string
+		if err := n.Decode(&s); err != nil {
+			return err
+		}
+		if glob.HasMeta(s) {
+			*d = Documents{Patterns: []string{s}}
+		} else {
+			*d = Documents{Dir: s}
+		}
+		return nil
+	case yaml.SequenceNode:
+		var ps []string
+		if err := n.Decode(&ps); err != nil {
+			return err
+		}
+		*d = Documents{Patterns: ps}
+		return nil
+	}
+	return fmt.Errorf("line %d: documents: must be a directory or a list of patterns", n.Line)
+}
+
+// String is how messages name the documents: the directory, or the
+// patterns separated by commas.
+func (d Documents) String() string {
+	if d.Patterns == nil {
+		return d.Dir
+	}
+	return strings.Join(d.Patterns, ", ")
 }
 
 // Judge is the judge section of the configuration.
@@ -92,16 +141,11 @@ var identifier = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 func (c *Config) validate() error {
 	var errs []error
-	for _, f := range []struct {
-		key   string
-		value *string
-	}{{"documents", &c.Documents}, {"policy", &c.Policy}} {
-		p, err := rootRelative(*f.value)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("%s: %w", f.key, err))
-			continue
-		}
-		*f.value = p
+	errs = append(errs, c.Documents.validate()...)
+	if p, err := rootRelative(c.Policy); err != nil {
+		errs = append(errs, fmt.Errorf("policy: %w", err))
+	} else {
+		c.Policy = p
 	}
 	if c.Entrypoint == "" {
 		errs = append(errs, errors.New("entrypoint: must be set"))
@@ -119,12 +163,45 @@ func (c *Config) validate() error {
 		}
 	}
 	for _, p := range c.Exclude {
-		if _, err := path.Match(p, ""); err != nil || p == "" {
+		if p == "" || glob.Validate(p) != nil {
 			errs = append(errs, fmt.Errorf("exclude: %q is not a valid pattern", p))
 		}
 	}
 	errs = append(errs, c.Judge.validate()...)
 	return errors.Join(errs...)
+}
+
+// validate checks the directory or every pattern, and cleans them.
+func (d *Documents) validate() []error {
+	if d.Patterns == nil {
+		p, err := rootRelative(d.Dir)
+		if err != nil {
+			return []error{fmt.Errorf("documents: %w", err)}
+		}
+		d.Dir = p
+		return nil
+	}
+	if len(d.Patterns) == 0 {
+		return []error{errors.New("documents: must be set")}
+	}
+	var errs []error
+	for i, pat := range d.Patterns {
+		if pat == "" {
+			errs = append(errs, errors.New("documents: an entry is empty"))
+			continue
+		}
+		p, err := rootRelative(pat)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("documents: %w", err))
+			continue
+		}
+		if glob.Validate(p) != nil {
+			errs = append(errs, fmt.Errorf("documents: %q is not a valid pattern", pat))
+			continue
+		}
+		d.Patterns[i] = p
+	}
+	return errs
 }
 
 // validate checks the judge section and fills in the defaults.
@@ -182,7 +259,7 @@ func rootRelative(p string) (string, error) {
 // one of the exclude patterns.
 func (c *Config) Excluded(p string) bool {
 	for _, pat := range c.Exclude {
-		if ok, _ := path.Match(pat, p); ok {
+		if glob.Match(pat, p) {
 			return true
 		}
 	}

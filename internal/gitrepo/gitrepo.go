@@ -51,3 +51,26 @@ func Ignored(root string, paths []string) (map[string]bool, error) {
 	}
 	return ignored, nil
 }
+
+// Files returns the root-relative paths of the files in the worktree that git
+// does not ignore: the tracked ones and the untracked ones not ignored, as git
+// ls-files lists them. It does not look inside .git, nor inside a nested
+// repository such as a submodule, which it lists as one entry. A tracked
+// file may be missing from the worktree.
+func Files(root string) ([]string, error) {
+	cmd := exec.Command("git", "ls-files", "-z", "--cached", "--others", "--exclude-standard")
+	cmd.Dir = root
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("git ls-files: %w: %s", err, strings.TrimSpace(stderr.String()))
+	}
+	var files []string
+	for p := range strings.SplitSeq(string(out), "\x00") {
+		if p != "" {
+			files = append(files, p)
+		}
+	}
+	return files, nil
+}
