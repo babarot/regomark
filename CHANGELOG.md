@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.4.0](https://github.com/babarot/regomark/compare/v0.3.0...v0.4.0) - 2026-11-19
+### New Features
+- Parse YAML front matter into the document input by @babarot in https://github.com/babarot/regomark/pull/21
+- Allow glob patterns in documents by @babarot in https://github.com/babarot/regomark/pull/22
+### Bug fixes
+- Start a table that interrupts a paragraph at its header row by @babarot in https://github.com/babarot/regomark/pull/20
+
 ## [v0.3.0](https://github.com/babarot/regomark/compare/v0.2.0...v0.3.0) - 2026-11-03
 ### New Features
 - Print violations grouped by file and colored at a terminal by @babarot in https://github.com/babarot/regomark/pull/11
