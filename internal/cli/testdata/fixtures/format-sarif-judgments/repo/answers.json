@@ -1,0 +1,1 @@
+{"answers": [{"key": "sha256:9ac13f05f191918bfc3a63f91f630a19e4b69f9bc8951efd96c32fd9300f4562", "verdict": "yes", "reason": "It names Store.Get.", "evidence_line": 5}]}

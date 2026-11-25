@@ -11,11 +11,12 @@ import (
 )
 
 // Formats are the names --format accepts.
-var Formats = []string{"text", "pretty", "github", "json"}
+var Formats = []string{"text", "pretty", "github", "json", "sarif"}
 
-// Write writes the violations, already sorted, in the format; pretty
-// wraps the messages to width cells, or not at all if width is 0.
-func Write(w io.Writer, format string, vs []policy.Violation, width int) error {
+// Write writes the violations, already sorted, in the format; ruleIDs are the
+// rule IDs the policy set declares, which sarif lists. pretty wraps the
+// messages to width cells, or not at all if width is 0.
+func Write(w io.Writer, format string, ruleIDs []string, vs []policy.Violation, width int) error {
 	switch format {
 	case "text":
 		return text(w, vs)
@@ -25,6 +26,8 @@ func Write(w io.Writer, format string, vs []policy.Violation, width int) error {
 		return github(w, vs)
 	case "json":
 		return jsonFormat(w, vs)
+	case "sarif":
+		return sarif(w, ruleIDs, vs)
 	default:
 		return fmt.Errorf("unknown format %q (want one of %s)", format, strings.Join(Formats, ", "))
 	}

@@ -31,7 +31,7 @@ const (
 )
 
 const usage = `Usage:
-  regomark check [--config .regomark.yaml] [--format text|pretty|github|json] [--judge | --no-judge | --judgments FILE]
+  regomark check [--config .regomark.yaml] [--format text|pretty|github|json|sarif] [--judge | --no-judge | --judgments FILE]
   regomark dump [--config .regomark.yaml] [--judge | --judgments FILE]
   regomark questions [--config .regomark.yaml]
   regomark --version
@@ -206,7 +206,7 @@ func check(ctx context.Context, args []string, dir string, stdout, stderr io.Wri
 	if err := res.Skip(cfg.SkipRules); err != nil {
 		return false, err
 	}
-	if err := report.Write(colored(stdout), *format, res.Violations, width); err != nil {
+	if err := report.Write(colored(stdout), *format, res.RuleIDs, res.Violations, width); err != nil {
 		return false, fmt.Errorf("output: %w", err)
 	}
 	return res.Denied(), nil

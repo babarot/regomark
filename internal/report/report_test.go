@@ -2,6 +2,7 @@ package report
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/babarot/regomark/internal/policy"
@@ -36,7 +37,7 @@ func TestWrite(t *testing.T) {
 	}
 	for _, tt := range tests {
 		var b bytes.Buffer
-		if err := Write(&b, tt.format, tt.vs, 0); err != nil {
+		if err := Write(&b, tt.format, nil, tt.vs, 0); err != nil {
 			t.Fatal(err)
 		}
 		if b.String() != tt.want {
@@ -46,7 +47,33 @@ func TestWrite(t *testing.T) {
 }
 
 func TestWriteUnknownFormat(t *testing.T) {
-	if err := Write(&bytes.Buffer{}, "xml", nil, 0); err == nil {
+	if err := Write(&bytes.Buffer{}, "xml", nil, nil, 0); err == nil {
 		t.Error("Write accepted xml")
+	}
+}
+
+func TestPathURI(t *testing.T) {
+	tests := []struct{ path, want string }{
+		{"docs/a.md", "docs/a.md"},
+		{"docs/a b%.md", "docs/a%20b%25.md"},
+		{"docs/#1?.md", "docs/%231%3F.md"},
+		{"a:b.md", "./a:b.md"},
+		{"docs/日本.md", "docs/%E6%97%A5%E6%9C%AC.md"},
+	}
+	for _, tt := range tests {
+		if got := pathURI(tt.path); got != tt.want {
+			t.Errorf("pathURI(%q) = %q, want %q", tt.path, got, tt.want)
+		}
+	}
+}
+
+func TestSARIFEscapesBraces(t *testing.T) {
+	var b bytes.Buffer
+	vs := []policy.Violation{{Rule: "R1", Severity: policy.Deny, Path: "docs/a.md", Line: 1, Message: "want {0} and }{"}}
+	if err := Write(&b, "sarif", []string{"R1"}, vs, 0); err != nil {
+		t.Fatal(err)
+	}
+	if want := `"text": "want {{0}} and }}{{"`; !strings.Contains(b.String(), want) {
+		t.Errorf("got\n%s\nwant it to contain %s", b.String(), want)
 	}
 }

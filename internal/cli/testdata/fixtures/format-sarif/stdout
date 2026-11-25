@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "regomark",
+          "version": "VERSION",
+          "informationUri": "https://github.com/babarot/regomark",
+          "rules": [
+            {
+              "id": "BROKEN"
+            },
+            {
+              "id": "HEADING"
+            },
+            {
+              "id": "LINK"
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "HEADING",
+          "ruleIndex": 1,
+          "level": "warning",
+          "message": {
+            "text": "h1 Other"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "docs/a%20b%25.md",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "LINK",
+          "ruleIndex": 2,
+          "level": "warning",
+          "message": {
+            "text": "file doc.md -> docs/doc.md"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "docs/a%20b%25.md",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "HEADING",
+          "ruleIndex": 1,
+          "level": "warning",
+          "message": {
+            "text": "h1 Title: with, punctuation 100%"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "docs/doc.md",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 1
+                }
+              }
+            }
+          ]
+        },
+        {
+          "ruleId": "BROKEN",
+          "ruleIndex": 0,
+          "level": "error",
+          "message": {
+            "text": "missing gone.md -> docs/gone.md"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "docs/doc.md",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 3
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
