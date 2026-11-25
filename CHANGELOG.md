@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.5.0](https://github.com/babarot/regomark/compare/v0.4.0...v0.5.0) - 2026-11-25
+### New Features
+- Add --format sarif to check by @babarot in https://github.com/babarot/regomark/pull/23
+
 ## [v0.4.0](https://github.com/babarot/regomark/compare/v0.3.0...v0.4.0) - 2026-11-19
 ### New Features
 - Parse YAML front matter into the document input by @babarot in https://github.com/babarot/regomark/pull/21
