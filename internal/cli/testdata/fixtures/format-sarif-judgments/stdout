@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "regomark",
+          "version": "VERSION",
+          "informationUri": "https://github.com/babarot/regomark",
+          "rules": [
+            {
+              "id": "BROKEN"
+            },
+            {
+              "id": "FAILED"
+            },
+            {
+              "id": "NOT_RUN"
+            },
+            {
+              "id": "SPEC"
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "SPEC",
+          "ruleIndex": 3,
+          "level": "warning",
+          "message": {
+            "text": "It names Store.Get."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "docs/adr.md",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 5
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

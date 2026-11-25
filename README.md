@@ -9,7 +9,7 @@ It is under development.
 ## Usage
 
 ```
-regomark check [--config .regomark.yaml] [--format text|pretty|github|json] [--judge | --no-judge | --judgments FILE]
+regomark check [--config .regomark.yaml] [--format text|pretty|github|json|sarif] [--judge | --no-judge | --judgments FILE]
 regomark dump [--config .regomark.yaml] [--judge | --judgments FILE]
 regomark questions [--config .regomark.yaml]
 regomark --version
@@ -19,9 +19,22 @@ regomark --version
 - `dump` prints the input the policies receive, as JSON, for writing policy tests. With `--judge` or `--judgments`, the judgments are in it; `REGOMARK_JUDGE` does not change what it prints.
 - `questions` prints the policies' questions with the prompts `judge.command` would get, as JSON, for a judge that answers them all at once.
 - `--judge` asks the policies' questions (see [Judging what a document means](#judging-what-a-document-means)) with `judge.command`; `--no-judge` does not, even with `REGOMARK_JUDGE=on`; `--judgments FILE` takes the answers from a file instead.
-- `--format`: `pretty`, the default at a terminal, groups the violations by file, puts each message under its line, severity and rule, wraps it to the width of the terminal, and ends with a count; `text`, the default otherwise, prints `path:line: [rule] message` (a warn as `path:line: warning: [rule] message`), `github` prints workflow commands that GitHub Actions shows as annotations (`::error` for a deny, `::warning` for a warn), and `json` prints an array of violations. Colors are used only at a terminal, and not when `NO_COLOR` is set to anything but empty ([no-color.org](https://no-color.org/)).
+- `--format`: `pretty`, the default at a terminal, groups the violations by file, puts each message under its line, severity and rule, wraps it to the width of the terminal, and ends with a count; `text`, the default otherwise, prints `path:line: [rule] message` (a warn as `path:line: warning: [rule] message`), `github` prints workflow commands that GitHub Actions shows as annotations (`::error` for a deny, `::warning` for a warn), `json` prints an array of violations, and `sarif` prints a [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) log for tools that read one, such as a CI step that turns the violations into review comments on a pull request, or GitHub code scanning (see [SARIF output](#sarif-output)). Colors are used only at a terminal, and not when `NO_COLOR` is set to anything but empty ([no-color.org](https://no-color.org/)).
 
 regomark runs in a git repository. Every path, `--config` included, is relative to the repository root (`git rev-parse --show-toplevel`), so it gives the same result from any directory in the repository.
+
+### SARIF output
+
+`--format sarif` prints one run whose `tool.driver.rules` are the rule IDs the policies declare in `rule_ids`, violated or not, and a result per violation, in the order of the other formats:
+
+- `ruleId` is the rule and `ruleIndex` its place in `rules`.
+- `level` is `error` for a deny and `warning` for a warn, the warns from the judgments included.
+- `message.text` is the message, without the `[rule]` the text formats put before it, and with `{` and `}` written as `{{` and `}}`, as SARIF requires of a message that has no placeholders.
+- `locations[0].physicalLocation` has the path, percent-encoded, as `artifactLocation.uri` relative to `uriBaseId` `%SRCROOT%`, the repository root, and the line as `region.startLine`.
+
+With no violation, `results` is empty. The exit code is the same as with the other formats, and an error that exits 2 goes to standard error, not into the log. regomark only writes the log; posting the results to a pull request is left to the CI that reads it, which needs a token that can write where regomark needs none.
+
+The results carry no `partialFingerprints`. A key that does not move with the line can be made from `ruleId`, `uri` and `message.text`, which every result has, and GitHub code scanning computes its own from the content of the line.
 
 ### Configuration
 

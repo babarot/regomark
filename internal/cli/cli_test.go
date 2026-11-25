@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/babarot/regomark/internal/version"
 )
 
 var update = flag.Bool("update", false, "rewrite the expected output of the fixtures")
@@ -75,9 +77,11 @@ func TestFixtures(t *testing.T) {
 			}
 			var stdout, stderr bytes.Buffer
 			code := Run(context.Background(), args, cwd, &stdout, &stderr)
+			// The version in a SARIF log changes with every release
+			out := strings.ReplaceAll(stdout.String(), `"version": "`+version.String()+`"`, `"version": "VERSION"`)
 
 			if *update {
-				write(t, filepath.Join(dir, "stdout"), stdout.String())
+				write(t, filepath.Join(dir, "stdout"), out)
 				write(t, filepath.Join(dir, "stderr"), stderr.String())
 				write(t, filepath.Join(dir, "exit"), strconv.Itoa(code)+"\n")
 				return
@@ -85,8 +89,8 @@ func TestFixtures(t *testing.T) {
 			if want := read(t, filepath.Join(dir, "exit")); strings.TrimSpace(want) != strconv.Itoa(code) {
 				t.Errorf("exit code = %d, want %s", code, strings.TrimSpace(want))
 			}
-			if want := read(t, filepath.Join(dir, "stdout")); stdout.String() != want {
-				t.Errorf("stdout:\n%s\nwant:\n%s", stdout.String(), want)
+			if want := read(t, filepath.Join(dir, "stdout")); out != want {
+				t.Errorf("stdout:\n%s\nwant:\n%s", out, want)
 			}
 			if want := read(t, filepath.Join(dir, "stderr")); stderr.String() != want {
 				t.Errorf("stderr:\n%s\nwant:\n%s", stderr.String(), want)
